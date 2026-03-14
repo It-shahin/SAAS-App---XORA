@@ -81,9 +81,9 @@ const Header = () => {
                 </li>
 
                 <li className="nav-li">
-                  <NavLink title="faq" />
+                  <NavLink title="faq" setIsOpen={setIsOpen}/>
                   <div className="dot" />
-                  <NavLink title="download" />
+                  <NavLink title="download" setIsOpen={setIsOpen}/>
                 </li>
               </ul>
             </nav>

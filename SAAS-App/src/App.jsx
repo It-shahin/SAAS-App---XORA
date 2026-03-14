@@ -3,7 +3,10 @@ import Header from './sections/header.jsx';
 import Hero from './sections/hero.jsx';
 import Features from './sections/Features.jsx';
 import Pricing from './sections/Pricing.jsx';
-import FAQ from './sections/FAQ.jsx';
+import FAQ from './sections/Faq.jsx';
+import Testimonials from './sections/Testimonials.jsx';
+import Download from './sections/Download.jsx';
+import Footer from './sections/Footer.jsx';
 
 function App() {
   return (
@@ -14,6 +17,9 @@ function App() {
       <Features />
       <Pricing />
       <FAQ />
+      <Testimonials />
+      <Download />
+      <Footer />
 
     </main>
   );
