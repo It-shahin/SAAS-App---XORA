@@ -1,6 +1,7 @@
 import React from 'react'
 import { Element, Link as LinkScroll } from 'react-scroll'
 import Button from '../components/Button'
+import { Link } from 'react-router-dom'
 
 const Hero = () => {
   return (
@@ -24,7 +25,8 @@ const Hero = () => {
                         </p>
                         <LinkScroll to="features" offset={-100} spy smooth>
                             <Button  icon="/images/zap.svg">
-                                Try Now
+                                <Link to="/signup" className="btn ...">Get Started Free</Link>
+
                             </Button>
                         </LinkScroll>
 
