@@ -1,16 +1,17 @@
-import { StrictMode } from 'react'
-import { createRoot } from 'react-dom/client'
+import React from 'react'
+import ReactDOM from 'react-dom/client'  // ← this line was missing
 import { BrowserRouter } from 'react-router-dom'
 import { AuthProvider } from './context/AuthContext'
-import './index.css'
+import { ProjectsProvider } from './context/ProjectsContext'
 import App from './App.jsx'
+import './index.css'
 
-createRoot(document.getElementById('root')).render(
-  <StrictMode>
-    <BrowserRouter>
+ReactDOM.createRoot(document.getElementById('root')).render(
+  <BrowserRouter>
     <AuthProvider>
-      <App />
+      <ProjectsProvider>
+        <App />
+      </ProjectsProvider>
     </AuthProvider>
   </BrowserRouter>
-  </StrictMode>,
 )

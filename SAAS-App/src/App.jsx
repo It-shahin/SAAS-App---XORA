@@ -7,6 +7,9 @@ import LandingPage from './pages/LandingPage'
 import ForgotPassword from './pages/ForgotPassword'
 import ResetPassword from './pages/ResetPassword'
 import ChangePassword from './pages/ChangePassword'
+import NewProject from './pages/NewProject'
+import ProjectDetail from './pages/ProjectDetail'
+import EditProject from './pages/EditProject'
 
 
 const App = () => (
@@ -22,6 +25,15 @@ const App = () => (
   <Route path="/change-password" element={
     <ProtectedRoute><ChangePassword /></ProtectedRoute>
   } />
+  <Route path="/projects/new" element={
+  <ProtectedRoute><NewProject /></ProtectedRoute>
+} />
+  <Route path="/projects/:id" element={
+  <ProtectedRoute><ProjectDetail /></ProtectedRoute>
+} />
+  <Route path="/projects/:id/edit" element={
+  <ProtectedRoute><EditProject /></ProtectedRoute>
+} />
 </Routes>
 
 )
