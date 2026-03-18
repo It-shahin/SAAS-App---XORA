@@ -107,7 +107,7 @@ const Dashboard = () => {
           </div>
           <div className="flex flex-col gap-2">
             <Link
-              to="/change-password"
+              to="/Change-password"
               className="text-p3 text-sm hover:text-p1 transition-colors"
             >
               Change password
