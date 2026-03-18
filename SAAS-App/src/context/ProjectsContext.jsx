@@ -1,10 +1,10 @@
 import { createContext, useContext, useEffect, useState } from 'react'
-import { databases } from '../lib/appwrite'
+import { account, databases } from '../lib/appwrite'
 import { useAuth } from './AuthContext'
 
-// YOUR EXACT IDs FROM APPWRITE CONSOLE
-const DATABASE_ID = '69ba0d06002eebdcbb81'   // ← your database ID
-const COLLECTION_ID = 'projects' // ← your table/collection ID
+const DATABASE_ID = '69ba0d06002eebdcbb81'
+const COLLECTION_ID = 'projects'
+export const FREE_PLAN_LIMIT = 3
 
 const ProjectsContext = createContext(null)
 
@@ -24,7 +24,7 @@ export const ProjectsProvider = ({ children }) => {
         databaseId: DATABASE_ID,
         collectionId: COLLECTION_ID
       })
-      const userProjects = result.documents.filter(doc => doc.userId === user.$iD)
+      const userProjects = result.documents.filter(doc => doc.userID === user.$id) // ← fixed typo
       setProjects(userProjects)
     } catch (error) {
       console.error('Failed to fetch projects:', error)
@@ -34,28 +34,42 @@ export const ProjectsProvider = ({ children }) => {
   }
 
   const createProject = async (projectData) => {
-  if (!user) throw new Error('Not logged in')
-  try {
-    const result = await databases.createDocument({
-      databaseId: DATABASE_ID,
-      collectionId: COLLECTION_ID,
-      documentId: 'unique()',
-      data: {
-        title: projectData.title,
-        description: projectData.description,
-        status: 'draft',
-        userID: user.$id
-      }
-    })
-    await fetchProjects()
-    return result
-  } catch (error) {
-    console.error('Failed to create project:', error)
-    throw error
+    try {
+      const result = await databases.createDocument({
+        databaseId: DATABASE_ID,
+        collectionId: COLLECTION_ID,
+        documentId: 'unique()',
+        data: {
+          title: projectData.title,
+          description: projectData.description,
+          style: projectData.style,
+          status: 'draft',
+          userID: user.$id,
+          mode: projectData.mode || 'text',
+          sourceImageUrl: projectData.imageUrl || '',
+          rendersUsed: 0  // ← initialize counter
+        }
+      })
+      await fetchProjects()
+      return result
+    } catch (error) {
+      console.error('Failed to create project:', error)
+      throw error
+    }
   }
+
+  // ← moved INSIDE provider so it can access fetchProjects
+  const incrementUserRenders = async () => {
+  const prefs = await account.getPrefs()
+  const current = prefs.rendersUsed || 0
+  await account.updatePrefs({ rendersUsed: current + 1 })
 }
 
-
+// Call this to get renders left
+const getUserRendersLeft = async () => {
+  const prefs = await account.getPrefs()
+  return FREE_PLAN_LIMIT - (prefs.rendersUsed || 0)
+}
 
   const deleteProject = async (projectId) => {
     try {
@@ -76,14 +90,14 @@ export const ProjectsProvider = ({ children }) => {
 
   return (
     <ProjectsContext.Provider value={{
-      projects,
-      loading,
-      createProject,
-      deleteProject,
-      refetch: fetchProjects
-    }}>
-      {children}
-    </ProjectsContext.Provider>
+    projects,
+    loading,
+    createProject,
+    deleteProject,
+    incrementUserRenders  // ← add this
+  }}>
+    {children}
+  </ProjectsContext.Provider>
   )
 }
 

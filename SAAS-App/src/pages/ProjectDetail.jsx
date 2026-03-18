@@ -1,7 +1,8 @@
 import { useState, useEffect } from 'react'
 import { useParams, useNavigate, Link } from 'react-router-dom'
-import { databases } from '../lib/appwrite'
-import { useProjects } from '../context/ProjectsContext'
+import { databases, account } from '../lib/appwrite'
+import { submitRender, submitImageRender, pollRender } from '../lib/shotstack'
+import { useProjects, FREE_PLAN_LIMIT } from '../context/ProjectsContext'
 
 const DATABASE_ID = '69ba0d06002eebdcbb81'
 const COLLECTION_ID = 'projects'
@@ -9,30 +10,111 @@ const COLLECTION_ID = 'projects'
 const ProjectDetail = () => {
   const { id } = useParams()
   const navigate = useNavigate()
-  const { deleteProject } = useProjects()
   const [project, setProject] = useState(null)
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState('')
   const [deleting, setDeleting] = useState(false)
   const [showConfirm, setShowConfirm] = useState(false)
+  const [generating, setGenerating] = useState(false)
+  const [genError, setGenError] = useState('')
 
-  useEffect(() => {
-    const fetchProject = async () => {
-      try {
-        const result = await databases.getDocument({
-          databaseId: DATABASE_ID,
-          collectionId: COLLECTION_ID,
-          documentId: id
-        })
-        setProject(result)
-      } catch (err) {
-        setError('Project not found.')
-      } finally {
-        setLoading(false)
-      }
+  // ← fixed: destructure incrementUserRenders, not updateProjectRenders
+  const { deleteProject, incrementUserRenders } = useProjects()
+
+  const fetchProject = async () => {
+    try {
+      const result = await databases.getDocument({
+        databaseId: DATABASE_ID,
+        collectionId: COLLECTION_ID,
+        documentId: id
+      })
+      setProject(result)
+    } catch (err) {
+      setError('Project not found.')
+    } finally {
+      setLoading(false)
     }
-    fetchProject()
-  }, [id])
+  }
+
+  useEffect(() => { fetchProject() }, [id])
+
+  const startPolling = async (renderId) => {
+    const interval = setInterval(async () => {
+      try {
+        const { status, url } = await pollRender(renderId)
+
+        if (status === 'done') {
+          clearInterval(interval)
+          await databases.updateDocument({
+            databaseId: DATABASE_ID,
+            collectionId: COLLECTION_ID,
+            documentId: id,
+            data: { status: 'completed', videoUrl: url }
+          })
+          await incrementUserRenders()  // ← now properly destructured above
+          await fetchProject()
+          setGenerating(false)
+        }
+
+        if (status === 'failed') {
+          clearInterval(interval)
+          await databases.updateDocument({
+            databaseId: DATABASE_ID,
+            collectionId: COLLECTION_ID,
+            documentId: id,
+            data: { status: 'draft' }
+          })
+          setGenError('Render failed. Please try again.')
+          setGenerating(false)
+        }
+      } catch (err) {
+        clearInterval(interval)
+        setGenError('Error checking render status.')
+        setGenerating(false)
+      }
+    }, 4000)
+  }
+
+  const handleGenerate = async () => {
+    setGenError('')
+    setGenerating(true)
+    try {
+      await databases.updateDocument({
+        databaseId: DATABASE_ID,
+        collectionId: COLLECTION_ID,
+        documentId: id,
+        data: { status: 'processing' }
+      })
+      await fetchProject()
+
+      let renderId
+
+      if (project.mode === 'image') {
+        renderId = await submitImageRender(
+          project.sourceImageUrl,
+          project.description || 'Cinematic slow camera movement'
+        )
+      } else {
+        renderId = await submitRender(
+          project.title,
+          project.description,
+          project.style || 'clean'
+        )
+      }
+
+      await databases.updateDocument({
+        databaseId: DATABASE_ID,
+        collectionId: COLLECTION_ID,
+        documentId: id,
+        data: { renderID: renderId }
+      })
+
+      startPolling(renderId)
+    } catch (err) {
+      setGenError(err.message || 'Failed to start generation.')
+      setGenerating(false)
+    }
+  }
 
   const handleDelete = async () => {
     setDeleting(true)
@@ -53,111 +135,134 @@ const ProjectDetail = () => {
   }
 
   if (loading) return (
-    <div className="flex min-h-screen flex-col justify-center px-6 py-12 lg:px-8 bg-gray-900">
-      <div className="sm:mx-auto sm:w-full sm:max-w-sm text-center">
-        <p className="text-gray-400 text-sm">Loading project...</p>
-      </div>
+    <div className="min-h-screen bg-s1 flex items-center justify-center">
+      <p className="text-p3">Loading project...</p>
     </div>
   )
 
   if (error) return (
-    <div className="flex min-h-screen flex-col justify-center px-6 py-12 lg:px-8 bg-gray-900">
-      <div className="sm:mx-auto sm:w-full sm:max-w-sm text-center">
-        <p className="text-red-400 text-sm mb-4">{error}</p>
-        <Link
-          to="/dashboard"
-          className="font-semibold text-indigo-400 hover:text-indigo-300 text-sm"
-        >
-          ← Back to dashboard
-        </Link>
-      </div>
+    <div className="min-h-screen bg-s1 flex flex-col items-center justify-center gap-4">
+      <p className="text-red-400">{error}</p>
+      <Link to="/dashboard" className="text-p1 hover:underline">← Back to dashboard</Link>
     </div>
   )
 
   return (
-    <div className="flex min-h-full flex-col justify-center px-6 py-12 lg:px-8 bg-gray-900">
+    <div className="min-h-screen bg-s1 text-white">
+
       {/* Header */}
-      <div className="sm:mx-auto sm:w-full sm:max-w-2xl mb-8">
-        <Link
-          to="/dashboard"
-          className="inline-flex items-center text-sm font-semibold text-indigo-400 hover:text-indigo-300 mb-6"
-        >
-          ← Back to dashboard
+      <header className="border-b border-s3/20 px-8 py-4 flex items-center justify-between">
+        <Link to="/">
+          <img src="/images/xora.svg" width={100} height={40} alt="logo" />
         </Link>
-        
-        {/* Project header */}
+        <Link to="/dashboard" className="text-p3 text-sm hover:text-p1 transition-colors">
+          ← Dashboard
+        </Link>
+      </header>
+
+      <div className="max-w-3xl mx-auto px-8 py-12">
+
+        {/* Top row */}
         <div className="flex items-start justify-between gap-4 mb-8">
           <div>
-            <p className="text-xs uppercase tracking-widest text-gray-400 mb-2">Project</p>
-            <h1 className="text-3xl font-bold text-white">{project.title}</h1>
+            <p className="text-p3 text-xs uppercase tracking-widest mb-2">Project</p>
+            <h1 className="text-4xl font-bold">{project.title}</h1>
           </div>
-          <span className={`px-3 py-1 rounded-full text-xs font-bold whitespace-nowrap ${
-            project.status === 'draft'
-              ? 'bg-gray-800/50 text-gray-400 border border-gray-500/30'
-              : project.status === 'processing'
-              ? 'bg-yellow-500/20 text-yellow-400 border border-yellow-500/30'
-              : 'bg-indigo-500/20 text-indigo-400 border border-indigo-500/30'
+          <span className={`mt-2 px-3 py-1 rounded-full text-xs font-bold ${
+            project.status === 'draft' ? 'bg-s3/20 text-p3'
+            : project.status === 'processing' ? 'bg-yellow-500/20 text-yellow-400'
+            : project.status === 'completed' ? 'bg-green-500/20 text-green-400'
+            : 'bg-red-500/20 text-red-400'
           }`}>
             {project.status}
           </span>
         </div>
-      </div>
 
-      <div className="sm:mx-auto sm:w-full sm:max-w-2xl space-y-6">
-        {/* Project info card */}
-        <div className="bg-white/5 border border-white/10 rounded-2xl p-8 space-y-6">
+        {/* Project info */}
+        <div className="bg-s2 border border-s3/20 rounded-2xl p-8 flex flex-col gap-6 mb-6">
           <div>
-            <p className="text-xs uppercase tracking-widest text-gray-400 mb-3">Script / Description</p>
-            <p className="text-gray-100 leading-relaxed whitespace-pre-wrap text-lg">
-              {project.description}
-            </p>
+            <p className="text-p3 text-xs uppercase tracking-widest mb-2">Script / Description</p>
+            <p className="text-white leading-relaxed whitespace-pre-wrap">{project.description}</p>
           </div>
-
-          <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+          <div className="flex flex-col sm:flex-row gap-6">
             <div>
-              <p className="text-xs uppercase tracking-widest text-gray-400 mb-2">Style</p>
-              <p className="text-white font-bold text-lg">
-                {styleLabels[project.style] || project.style}
-              </p>
+              <p className="text-p3 text-xs uppercase tracking-widest mb-2">Style</p>
+              <p className="text-white font-bold">{styleLabels[project.style] || project.style || '—'}</p>
             </div>
             <div>
-              <p className="text-xs uppercase tracking-widest text-gray-400 mb-2">Created</p>
-              <p className="text-white font-bold text-lg">
+              <p className="text-p3 text-xs uppercase tracking-widest mb-2">Created</p>
+              <p className="text-white font-bold">
                 {new Date(project.$createdAt).toLocaleDateString('en-US', {
                   year: 'numeric', month: 'long', day: 'numeric'
                 })}
               </p>
             </div>
-            <div>
-              <p className="text-xs uppercase tracking-widest text-gray-400 mb-2">Last Updated</p>
-              <p className="text-white font-bold text-lg">
-                {new Date(project.$updatedAt).toLocaleDateString('en-US', {
-                  year: 'numeric', month: 'long', day: 'numeric'
-                })}
-              </p>
+          </div>
+        </div>
+
+        {/* Video player */}
+        {project.status === 'completed' && project.videoUrl && (
+          <div className="bg-s2 border border-green-500/20 rounded-2xl p-6 mb-6">
+            <p className="text-p3 text-xs uppercase tracking-widest mb-4">Generated Video</p>
+            <video controls className="w-full rounded-xl" src={project.videoUrl} />
+            <div className="flex gap-4 mt-4">
+              <a
+                href={project.videoUrl}
+                download
+                target="_blank"
+                rel="noreferrer"
+                className="bg-p1 hover:bg-p1/80 text-white font-bold px-6 py-2.5 rounded-xl text-sm transition-colors"
+              >
+                ⬇ Download Video
+              </a>
+              <button
+                onClick={handleGenerate}
+                disabled={generating}
+                className="text-p3 text-sm hover:text-p1 border border-s3/20 px-5 py-2.5 rounded-xl transition-colors"
+              >
+                🔄 Regenerate
+              </button>
             </div>
           </div>
-        </div>
+        )}
 
-        {/* Generate video card */}
-        <div className="bg-indigo-500/10 border border-indigo-500/30 rounded-2xl p-8 flex flex-col sm:flex-row items-center justify-between gap-6">
-          <div>
-            <h3 className="text-white font-bold text-xl mb-2">Ready to generate?</h3>
-            <p className="text-gray-300 text-sm">Turn your script into a video using AI. Takes 1–2 minutes.</p>
+        {/* Generate card */}
+        {project.status !== 'completed' && (
+          <div className="bg-p1/10 border border-p1/30 rounded-2xl p-8 mb-6">
+            {genError && (
+              <div className="bg-red-500/10 border border-red-500/30 rounded-xl px-4 py-3 mb-4">
+                <p className="text-red-400 text-sm">{genError}</p>
+              </div>
+            )}
+
+            {project.status === 'processing' || generating ? (
+              <div className="flex flex-col items-center gap-4 py-4">
+                <div className="size-12 border-4 border-p1/30 border-t-p1 rounded-full animate-spin" />
+                <p className="text-white font-bold">Generating your video...</p>
+                <p className="text-p3 text-sm">This takes 1–2 minutes. You can leave and come back.</p>
+              </div>
+            ) : (
+              <div className="flex flex-col sm:flex-row items-center justify-between gap-6">
+                <div>
+                  <h3 className="text-white font-bold text-lg mb-1">Ready to generate?</h3>
+                  <p className="text-p3 text-sm">Turn your script into a video using AI. Takes 1–2 minutes.</p>
+                </div>
+                <button
+                  onClick={handleGenerate}
+                  className="bg-p1 hover:bg-p1/80 text-white font-bold px-8 py-3 rounded-xl whitespace-nowrap transition-colors"
+                >
+                  ✨ Generate Video
+                </button>
+              </div>
+            )}
           </div>
-          <button
-            disabled
-            className="bg-indigo-500/50 text-white font-bold px-8 py-3 rounded-xl opacity-70 cursor-not-allowed whitespace-nowrap text-sm"
-          >
-            Generate Video — Coming Soon
-          </button>
-        </div>
+        )}
 
         {/* Actions row */}
-        <div className="flex flex-col sm:flex-row gap-4 pt-8">
+        <div className="flex items-center justify-between">
           <Link
             to={`/projects/${id}/edit`}
-            className="flex-1 flex justify-center items-center py-3 px-6 text-sm font-semibold text-gray-400 border border-white/10 rounded-xl hover:text-white hover:border-white/20 transition-all"
+            className="text-p3 text-sm hover:text-p1 transition-colors border border-s3/20 px-5 py-2.5 rounded-xl"
           >
             ✏️ Edit Project
           </Link>
@@ -165,31 +270,30 @@ const ProjectDetail = () => {
           {!showConfirm ? (
             <button
               onClick={() => setShowConfirm(true)}
-              className="flex-1 flex justify-center items-center py-3 px-6 text-sm font-semibold text-red-400 border border-red-500/20 rounded-xl hover:text-red-300 hover:border-red-500/40 transition-all"
+              className="text-red-400 text-sm hover:text-red-300 transition-colors border border-red-500/20 px-5 py-2.5 rounded-xl"
             >
-              🗑️ Delete Project
+              🗑 Delete Project
             </button>
           ) : (
-            <div className="flex flex-col sm:flex-row items-center gap-3 w-full">
-              <p className="text-gray-400 text-sm flex-shrink-0">Are you sure?</p>
-              <div className="flex gap-2 flex-1">
-                <button
-                  onClick={() => setShowConfirm(false)}
-                  className="flex-1 py-2.5 px-4 text-sm font-semibold text-gray-400 border border-white/10 rounded-xl hover:text-white hover:border-white/20 transition-all"
-                >
-                  Cancel
-                </button>
-                <button
-                  onClick={handleDelete}
-                  disabled={deleting}
-                  className="flex-1 bg-red-500/20 hover:bg-red-500/40 text-red-400 text-sm font-bold py-2.5 px-4 rounded-xl border border-red-500/30 transition-all disabled:opacity-60 disabled:cursor-not-allowed"
-                >
-                  {deleting ? 'Deleting...' : 'Yes, delete'}
-                </button>
-              </div>
+            <div className="flex items-center gap-3">
+              <p className="text-p3 text-sm">Are you sure?</p>
+              <button
+                onClick={() => setShowConfirm(false)}
+                className="text-p3 text-sm hover:text-p1 px-4 py-2 rounded-xl border border-s3/20 transition-colors"
+              >
+                Cancel
+              </button>
+              <button
+                onClick={handleDelete}
+                disabled={deleting}
+                className="bg-red-500/20 hover:bg-red-500/40 text-red-400 text-sm font-bold px-4 py-2 rounded-xl transition-colors disabled:opacity-50"
+              >
+                {deleting ? 'Deleting...' : 'Yes, delete'}
+              </button>
             </div>
           )}
         </div>
+
       </div>
     </div>
   )

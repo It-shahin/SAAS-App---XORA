@@ -1,10 +1,24 @@
 import { Link } from 'react-router-dom'
+import { useState, useEffect } from 'react'
 import { useAuth } from '../context/AuthContext'
-import { useProjects } from '../context/ProjectsContext'
+import { useProjects, FREE_PLAN_LIMIT } from '../context/ProjectsContext'
+import { account } from '../lib/appwrite'
 
 const Dashboard = () => {
   const { user, logout } = useAuth()
-  const { projects, loading: projectsLoading, deleteProject } = useProjects()
+  const { projects, loading: projectsLoading } = useProjects()
+
+  // Real renders counter
+  const [rendersUsed, setRendersUsed] = useState(0)
+
+    useEffect(() => {
+  account.getPrefs().then(prefs => {
+    setRendersUsed(prefs.rendersUsed || 0)
+  })
+}, [projects])
+  const totalRendersUsed = projects.reduce((sum, p) => sum + (p.rendersUsed || 0), 0)
+  const totalRendersLeft = FREE_PLAN_LIMIT - rendersUsed
+  const isLimitReached = totalRendersLeft <= 0
 
   return (
     <div className="flex min-h-screen flex-col bg-gray-900">
@@ -34,6 +48,7 @@ const Dashboard = () => {
 
       <div className="flex-1 px-6 py-12 lg:px-8">
         <div className="max-w-6xl mx-auto space-y-12">
+
           {/* Welcome banner */}
           <div className="text-center">
             <h1 className="text-4xl lg:text-5xl font-bold text-white mb-4">
@@ -50,14 +65,29 @@ const Dashboard = () => {
               <span className="text-gray-400 text-xs uppercase tracking-widest">Total Projects</span>
               <span className="text-4xl font-bold text-white">{projects.length}</span>
             </div>
+
             <div className="bg-white/5 border border-white/10 rounded-2xl p-8 flex flex-col gap-3 hover:border-white/20 transition-all">
               <span className="text-gray-400 text-xs uppercase tracking-widest">Videos Generated</span>
-              <span className="text-4xl font-bold text-white">0</span>
+              <span className="text-4xl font-bold text-white">{totalRendersUsed}</span>
             </div>
-            <div className="bg-white/5 border border-white/10 rounded-2xl p-8 flex flex-col gap-3 hover:border-white/20 transition-all">
+
+            {/* Renders Left card */}
+            <div className={`bg-white/5 border rounded-2xl p-8 flex flex-col gap-3 hover:border-white/20 transition-all ${
+              isLimitReached ? 'border-red-500/40' : totalRendersLeft === 1 ? 'border-yellow-500/40' : 'border-white/10'
+            }`}>
               <span className="text-gray-400 text-xs uppercase tracking-widest">Renders Left</span>
-              <span className="text-4xl font-bold text-indigo-400">3 / 3</span>
-              <span className="text-gray-500 text-xs bg-gray-800/50 px-2 py-1 rounded-full inline-block">Free plan</span>
+              <span className={`text-4xl font-bold ${
+                isLimitReached ? 'text-red-400' : totalRendersLeft === 1 ? 'text-yellow-400' : 'text-white'
+              }`}>
+                {totalRendersLeft} / {FREE_PLAN_LIMIT}
+              </span>
+              <span className="text-gray-500 text-xs">
+                {isLimitReached
+                  ? '🚫 Limit reached — Upgrade to generate more'
+                  : totalRendersLeft === 1
+                  ? '⚠️ Last render remaining!'
+                  : 'Free plan'}
+              </span>
             </div>
           </div>
 
@@ -97,32 +127,35 @@ const Dashboard = () => {
               </div>
             ) : (
               <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-                {projects.map((project) => (
-                  <Link
-                    key={project.$id}
-                    to={`/projects/${project.$id}`}
-                    className="group bg-white/5 border border-white/10 rounded-2xl p-6 hover:border-indigo-500/50 hover:bg-white/10 transition-all shadow-lg hover:shadow-2xl"
-                  >
-                    <h3 className="font-bold text-xl mb-3 group-hover:text-indigo-400 transition-colors line-clamp-2">
-                      {project.title}
-                    </h3>
-                    <p className="text-gray-400 text-sm mb-4 line-clamp-2">
-                      {project.description}
-                    </p>
-                    <div className="flex items-center justify-between">
-                      <span className="text-gray-500 text-xs">
-                        {new Date(project.$createdAt).toLocaleDateString()}
-                      </span>
-                      <span className={`px-3 py-1 rounded-full text-xs font-bold ${
-                        project.status === 'draft' 
-                          ? 'bg-gray-800/50 text-gray-400 border border-gray-500/30' 
-                          : 'bg-indigo-500/20 text-indigo-400 border border-indigo-500/30'
-                      }`}>
-                        {project.status}
-                      </span>
-                    </div>
-                  </Link>
-                ))}
+                {projects.map((project) => {
+                  const projectRendersLeft = FREE_PLAN_LIMIT - (project.rendersUsed || 0)
+                  return (
+                    <Link
+                      key={project.$id}
+                      to={`/projects/${project.$id}`}
+                      className="group bg-white/5 border border-white/10 rounded-2xl p-6 hover:border-indigo-500/50 hover:bg-white/10 transition-all shadow-lg hover:shadow-2xl"
+                    >
+                      <h3 className="font-bold text-xl mb-3 group-hover:text-indigo-400 transition-colors line-clamp-2">
+                        {project.title}
+                      </h3>
+                      <p className="text-gray-400 text-sm mb-4 line-clamp-2">
+                        {project.description}
+                      </p>
+                      <div className="flex items-center justify-between">
+                        <span className="text-gray-500 text-xs">
+                          Renders Left {projectRendersLeft} / {FREE_PLAN_LIMIT}
+                        </span>
+                        <span className={`px-3 py-1 rounded-full text-xs font-bold ${
+                          project.status === 'draft'
+                            ? 'bg-gray-800/50 text-gray-400 border border-gray-500/30'
+                            : 'bg-indigo-500/20 text-indigo-400 border border-indigo-500/30'
+                        }`}>
+                          {project.status}
+                        </span>
+                      </div>
+                    </Link>
+                  )
+                })}
               </div>
             )}
           </div>
@@ -152,6 +185,7 @@ const Dashboard = () => {
               </div>
             </div>
           </div>
+
         </div>
       </div>
     </div>
