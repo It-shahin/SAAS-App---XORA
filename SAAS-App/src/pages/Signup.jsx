@@ -1,6 +1,7 @@
 import { useState } from 'react'
 import { useAuth } from '../context/AuthContext'
 import { useNavigate, Link } from 'react-router-dom'
+import { getSafeAuthError } from '../lib/authErrors'
 
 const Signup = () => {
   const { signup } = useAuth()
@@ -9,40 +10,34 @@ const Signup = () => {
   const [email, setEmail] = useState('')
   const [password, setPassword] = useState('')
   const [error, setError] = useState('')
+  const [loading, setLoading] = useState(false)
 
   const handleSubmit = async (e) => {
     e.preventDefault()
     setError('')
+    setLoading(true)
     try {
       await signup(email, password, name)
       navigate('/dashboard')
     } catch (err) {
-      setError(err.message)
+      setError(getSafeAuthError(err))
+    } finally {
+      setLoading(false)
     }
   }
 
   return (
     <div className="flex min-h-screen flex-col justify-center px-6 py-12 lg:px-8 bg-gray-900">
       <div className="sm:mx-auto sm:w-full sm:max-w-sm">
-        <a href="./">
-        <img
-          src="/images/xora.svg"
-          alt="Trimmix AI"
-          className="mx-auto h-10 w-auto"
-        />
-        </a>
-        <h2 className="mt-10 text-center text-2xl font-bold tracking-tight text-white">
-          Create your account
-        </h2>
+        <Link to="/">
+          <img src="/images/xora.svg" alt="Trimix AI" className="mx-auto h-10 w-auto" />
+        </Link>
+        <h2 className="mt-10 text-center text-2xl font-bold tracking-tight text-white">Create your account</h2>
       </div>
 
       <div className="mt-10 sm:mx-auto sm:w-full sm:max-w-sm">
         <form onSubmit={handleSubmit} className="space-y-6">
-          {error && (
-            <p className="text-red-400 text-sm text-center">
-              {error}
-            </p>
-          )}
+          {error && <p className="text-red-400 text-sm text-center">{error}</p>}
 
           <div>
             <label htmlFor="name" className="block text-sm font-medium text-gray-100">
@@ -55,7 +50,7 @@ const Signup = () => {
                 name="name"
                 required
                 value={name}
-                onChange={e => setName(e.target.value)}
+                onChange={(e) => setName(e.target.value)}
                 className="block w-full rounded-md bg-white/5 px-3 py-1.5 text-base text-white outline outline-1 -outline-offset-1 outline-white/10 placeholder:text-gray-500 focus:outline focus:outline-2 focus:-outline-offset-2 focus:outline-indigo-500 sm:text-sm"
                 placeholder="John Doe"
               />
@@ -74,7 +69,7 @@ const Signup = () => {
                 required
                 autoComplete="email"
                 value={email}
-                onChange={e => setEmail(e.target.value)}
+                onChange={(e) => setEmail(e.target.value)}
                 className="block w-full rounded-md bg-white/5 px-3 py-1.5 text-base text-white outline outline-1 -outline-offset-1 outline-white/10 placeholder:text-gray-500 focus:outline focus:outline-2 focus:-outline-offset-2 focus:outline-indigo-500 sm:text-sm"
                 placeholder="you@example.com"
               />
@@ -93,23 +88,22 @@ const Signup = () => {
                 required
                 autoComplete="new-password"
                 value={password}
-                onChange={e => setPassword(e.target.value)}
+                onChange={(e) => setPassword(e.target.value)}
                 minLength={8}
                 className="block w-full rounded-md bg-white/5 px-3 py-1.5 text-base text-white outline outline-1 -outline-offset-1 outline-white/10 placeholder:text-gray-500 focus:outline focus:outline-2 focus:-outline-offset-2 focus:outline-indigo-500 sm:text-sm"
-                placeholder="••••••••"
+                placeholder="********"
               />
-              <p className="mt-1 text-xs text-gray-400">
-                Password must be at least 8 characters
-              </p>
+              <p className="mt-1 text-xs text-gray-400">Password must be at least 8 characters</p>
             </div>
           </div>
 
           <div>
             <button
               type="submit"
-              className="flex w-full justify-center rounded-md bg-indigo-500 px-3 py-1.5 text-sm font-semibold text-white hover:bg-indigo-400 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-indigo-500"
+              disabled={loading}
+              className="flex w-full justify-center rounded-md bg-indigo-500 px-3 py-1.5 text-sm font-semibold text-white hover:bg-indigo-400 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-indigo-500 disabled:opacity-60 disabled:cursor-not-allowed"
             >
-              Create account
+              {loading ? 'Creating account...' : 'Create account'}
             </button>
           </div>
         </form>

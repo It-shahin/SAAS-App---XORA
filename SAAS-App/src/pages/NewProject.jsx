@@ -18,6 +18,8 @@ const NewProject = () => {
   const [imagePreview, setImagePreview] = useState(null)
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState('')
+  const MAX_IMAGE_SIZE_BYTES = 10 * 1024 * 1024
+  const ALLOWED_TYPES = ['image/jpeg', 'image/png', 'image/webp']
 
   const styles = [
     { value: 'clean', label: 'Clean & Modern' },
@@ -29,6 +31,15 @@ const NewProject = () => {
   const handleImageChange = (e) => {
     const file = e.target.files[0]
     if (!file) return
+    if (!ALLOWED_TYPES.includes(file.type)) {
+      setError('Please upload a JPG, PNG, or WEBP image.')
+      return
+    }
+    if (file.size > MAX_IMAGE_SIZE_BYTES) {
+      setError('Image is too large. Max size is 10MB.')
+      return
+    }
+    setError('')
     setImageFile(file)
     setImagePreview(URL.createObjectURL(file))
   }
@@ -37,6 +48,15 @@ const NewProject = () => {
     e.preventDefault()
     const file = e.dataTransfer.files[0]
     if (!file) return
+    if (!ALLOWED_TYPES.includes(file.type)) {
+      setError('Please upload a JPG, PNG, or WEBP image.')
+      return
+    }
+    if (file.size > MAX_IMAGE_SIZE_BYTES) {
+      setError('Image is too large. Max size is 10MB.')
+      return
+    }
+    setError('')
     setImageFile(file)
     setImagePreview(URL.createObjectURL(file))
   }
@@ -53,6 +73,12 @@ const NewProject = () => {
 
     if (mode === 'image' && !imageFile) {
       return setError('Please upload an image to continue.')
+    }
+    if (!formData.title.trim()) {
+      return setError('Project title is required.')
+    }
+    if (mode === 'text' && !formData.description.trim()) {
+      return setError('Please add a script/description.')
     }
 
     setLoading(true)

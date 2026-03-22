@@ -1,11 +1,11 @@
 import { useState } from 'react'
 import { useAuth } from '../context/AuthContext'
 import { account } from '../lib/appwrite'
-import { useNavigate, Link } from 'react-router-dom'
+import { Link } from 'react-router-dom'
+import { getSafeAuthError } from '../lib/authErrors'
 
 const ChangePassword = () => {
   const { user } = useAuth()
-  const navigate = useNavigate()
   const [oldPassword, setOldPassword] = useState('')
   const [newPassword, setNewPassword] = useState('')
   const [confirm, setConfirm] = useState('')
@@ -19,21 +19,23 @@ const ChangePassword = () => {
     setSuccess('')
 
     if (newPassword !== confirm) {
-      return setError('New passwords do not match.')
+      setError('New passwords do not match.')
+      return
     }
     if (newPassword.length < 8) {
-      return setError('Password must be at least 8 characters.')
+      setError('Password must be at least 8 characters.')
+      return
     }
 
     setLoading(true)
     try {
       await account.updatePassword(newPassword, oldPassword)
-      setSuccess('Password changed successfully!')
+      setSuccess('Password changed successfully.')
       setOldPassword('')
       setNewPassword('')
       setConfirm('')
     } catch (err) {
-      setError(err.message)
+      setError(getSafeAuthError(err, 'Could not update password. Please try again.'))
     } finally {
       setLoading(false)
     }
@@ -46,11 +48,9 @@ const ChangePassword = () => {
           to="/dashboard"
           className="inline-flex items-center text-sm font-semibold text-indigo-400 hover:text-indigo-300 mb-6"
         >
-          ← Back to dashboard
+          Back to dashboard
         </Link>
-        <h2 className="text-center text-2xl font-bold tracking-tight text-white">
-          Change Password
-        </h2>
+        <h2 className="text-center text-2xl font-bold tracking-tight text-white">Change Password</h2>
         <p className="mt-2 text-center text-sm font-normal text-indigo-400">
           Logged in as <span className="font-semibold text-white">{user?.email}</span>
         </p>
@@ -70,10 +70,7 @@ const ChangePassword = () => {
           )}
 
           <div>
-            <label
-              htmlFor="oldPassword"
-              className="block text-sm font-medium text-gray-100"
-            >
+            <label htmlFor="oldPassword" className="block text-sm font-medium text-gray-100">
               Current password
             </label>
             <div className="mt-2">
@@ -82,18 +79,15 @@ const ChangePassword = () => {
                 type="password"
                 required
                 value={oldPassword}
-                onChange={e => setOldPassword(e.target.value)}
+                onChange={(e) => setOldPassword(e.target.value)}
                 className="block w-full rounded-md bg-white/5 px-3 py-1.5 text-base text-white outline outline-1 -outline-offset-1 outline-white/10 placeholder:text-gray-500 focus:outline focus:outline-2 focus:-outline-offset-2 focus:outline-indigo-500 sm:text-sm"
-                placeholder="••••••••"
+                placeholder="********"
               />
             </div>
           </div>
 
           <div>
-            <label
-              htmlFor="newPassword"
-              className="block text-sm font-medium text-gray-100"
-            >
+            <label htmlFor="newPassword" className="block text-sm font-medium text-gray-100">
               New password
             </label>
             <div className="mt-2">
@@ -103,18 +97,15 @@ const ChangePassword = () => {
                 minLength={8}
                 required
                 value={newPassword}
-                onChange={e => setNewPassword(e.target.value)}
+                onChange={(e) => setNewPassword(e.target.value)}
                 className="block w-full rounded-md bg-white/5 px-3 py-1.5 text-base text-white outline outline-1 -outline-offset-1 outline-white/10 placeholder:text-gray-500 focus:outline focus:outline-2 focus:-outline-offset-2 focus:outline-indigo-500 sm:text-sm"
-                placeholder="••••••••"
+                placeholder="********"
               />
             </div>
           </div>
 
           <div>
-            <label
-              htmlFor="confirmPassword"
-              className="block text-sm font-medium text-gray-100"
-            >
+            <label htmlFor="confirmPassword" className="block text-sm font-medium text-gray-100">
               Confirm new password
             </label>
             <div className="mt-2">
@@ -124,9 +115,9 @@ const ChangePassword = () => {
                 minLength={8}
                 required
                 value={confirm}
-                onChange={e => setConfirm(e.target.value)}
+                onChange={(e) => setConfirm(e.target.value)}
                 className="block w-full rounded-md bg-white/5 px-3 py-1.5 text-base text-white outline outline-1 -outline-offset-1 outline-white/10 placeholder:text-gray-500 focus:outline focus:outline-2 focus:-outline-offset-2 focus:outline-indigo-500 sm:text-sm"
-                placeholder="••••••••"
+                placeholder="********"
               />
             </div>
           </div>
@@ -147,3 +138,4 @@ const ChangePassword = () => {
 }
 
 export default ChangePassword
+

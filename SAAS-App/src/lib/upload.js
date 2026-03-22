@@ -3,6 +3,10 @@ import { storage, ID } from './appwrite'
 const BUCKET_ID = '69bab09f003754eae4c6'
 
 export const uploadImage = async (file) => {
+  if (!file) {
+    throw new Error('No file selected.')
+  }
+
   const result = await storage.createFile({
     bucketId: BUCKET_ID,
     fileId: ID.unique(),

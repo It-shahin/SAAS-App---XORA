@@ -1,6 +1,7 @@
 import { useState, useEffect } from 'react'
 import { useParams, useNavigate, Link } from 'react-router-dom'
 import { databases } from '../lib/appwrite'
+import { useAuth } from '../context/AuthContext'
 
 const DATABASE_ID = '69ba0d06002eebdcbb81'
 const COLLECTION_ID = 'projects'
@@ -8,6 +9,7 @@ const COLLECTION_ID = 'projects'
 const EditProject = () => {
   const { id } = useParams()
   const navigate = useNavigate()
+  const { user } = useAuth()
   const [formData, setFormData] = useState({
     title: '',
     description: '',
@@ -33,6 +35,12 @@ const EditProject = () => {
           collectionId: COLLECTION_ID,
           documentId: id
         })
+
+        if (result.userID !== user?.$id) {
+          setError('You do not have access to this project.')
+          return
+        }
+
         setFormData({
           title: result.title,
           description: result.description,
@@ -45,7 +53,7 @@ const EditProject = () => {
       }
     }
     fetchProject()
-  }, [id])
+  }, [id, user?.$id])
 
   const handleSubmit = async (e) => {
     e.preventDefault()
@@ -57,8 +65,8 @@ const EditProject = () => {
         collectionId: COLLECTION_ID,
         documentId: id,
         data: {
-          title: formData.title,
-          description: formData.description,
+          title: formData.title.trim(),
+          description: formData.description.trim(),
           style: formData.style
         }
       })

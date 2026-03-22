@@ -6,7 +6,7 @@ export const features = [
     icon: "/images/feature-1.png",
     caption: "Easy integration",
     title: "Work smarter not harder",
-    text: "With Xora, tedious tasks are history. Automation and smart processes bring your productivity to new heights. It's like having an extra cup of coffee, but without the jitters.",
+    text: "With Trimix AI, tedious tasks are history. Automation and smart processes bring your productivity to new heights. It's like having an extra cup of coffee, but without the jitters.",
     button: {
       icon: "/images/magictouch.svg",
       title: "Watch the demo",
@@ -17,7 +17,7 @@ export const features = [
     icon: "/images/feature-2.png",
     caption: "Secure & trustworthy",
     title: "Sleep easy, we got your back",
-    text: "Your data security is our priority. With state-of-the-art encryption and robust privacy controls, Xora helps keeps your information secure and locked up tighter than Fort Knox.",
+    text: "Your data security is our priority. With state-of-the-art encryption and robust privacy controls, Trimix AI helps keeps your information secure and locked up tighter than Fort Knox.",
     button: {
       icon: "/images/docs.svg",
       title: "Read the docs",
@@ -51,13 +51,13 @@ export const details = [
 export const faq = [
   {
     id: "0",
-    question: "How easy is it to setup Xora?",
+    question: "How easy is it to setup Trimix AI?",
     answer:
       "Absolutely! Not only you can upgrade your plan at any time but you also get a prorated discount giving you maximum value for your subscription.",
   },
   {
     id: "1",
-    question: "Can I integrate Xora with other platforms?",
+    question: "Can I integrate Trimix AI with other platforms?",
     answer:
       "Absolutely! Not only you can upgrade your plan at any time but you also get a prorated discount giving you maximum value for your subscription.",
   },
@@ -166,7 +166,7 @@ export const testimonials = [
     role: "Globalnomads",
     avatarUrl: "/images/testimonials/jessica-saunders.png",
     comment:
-      "Xora's customer support is second to none! They’re like my tech superheroes, always there when I need them.",
+      "Trimix AI's customer support is second to none! They’re like my tech superheroes, always there when I need them.",
   },
   {
     id: "1",
@@ -198,7 +198,7 @@ export const testimonials = [
     role: "Floclips",
     avatarUrl: "/images/testimonials/becky-snider.png",
     comment:
-      "Switched to Xora last month, and I'm already seeing results. Best decision for our team!",
+      "Switched to Trimix AI last month, and I'm already seeing results. Best decision for our team!",
   },
   {
     id: "5",

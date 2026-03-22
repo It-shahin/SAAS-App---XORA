@@ -7,6 +7,7 @@ import { account } from '../lib/appwrite'
 const Dashboard = () => {
   const { user, logout } = useAuth()
   const { projects, loading: projectsLoading } = useProjects()
+  const [isLoggingOut, setIsLoggingOut] = useState(false)
 
   // Real renders counter
   const [rendersUsed, setRendersUsed] = useState(0)
@@ -17,15 +18,24 @@ const Dashboard = () => {
   })
 }, [projects])
   const totalRendersUsed = projects.reduce((sum, p) => sum + (p.rendersUsed || 0), 0)
-  const totalRendersLeft = FREE_PLAN_LIMIT - rendersUsed
+  const totalRendersLeft = Math.max(0, FREE_PLAN_LIMIT - rendersUsed)
   const isLimitReached = totalRendersLeft <= 0
+
+  const handleLogout = async () => {
+    setIsLoggingOut(true)
+    try {
+      await logout()
+    } finally {
+      setIsLoggingOut(false)
+    }
+  }
 
   return (
     <div className="flex min-h-screen flex-col bg-gray-900">
       {/* Top navbar */}
       <header className="border-b border-white/10 px-6 py-4 flex items-center justify-between sticky top-0 z-10 backdrop-blur-sm bg-gray-900/80">
         <Link to="/">
-          <img src="/images/xora.svg" width={120} height={48} alt="Xora" />
+          <img src="/images/xora.svg" width={120} height={48} alt="Trimix AI" />
         </Link>
         <div className="flex items-center gap-4">
           <Link
@@ -35,13 +45,14 @@ const Dashboard = () => {
             Settings
           </Link>
           <button
-            onClick={logout}
+            onClick={handleLogout}
+            disabled={isLoggingOut}
             className="text-gray-400 text-sm hover:text-white font-semibold transition-colors"
           >
-            Logout
+            {isLoggingOut ? 'Logging out...' : 'Logout'}
           </button>
           <div className="w-9 h-9 rounded-full bg-indigo-500 flex items-center justify-center text-white font-bold text-sm shadow-lg">
-            {user?.name?.charAt(0)?.toUpperCase()}
+            {user?.name?.charAt(0)?.toUpperCase() || user?.email?.charAt(0)?.toUpperCase() || 'U'}
           </div>
         </div>
       </header>
@@ -128,7 +139,6 @@ const Dashboard = () => {
             ) : (
               <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
                 {projects.map((project) => {
-                  const projectRendersLeft = FREE_PLAN_LIMIT - (project.rendersUsed || 0)
                   return (
                     <Link
                       key={project.$id}
@@ -143,7 +153,7 @@ const Dashboard = () => {
                       </p>
                       <div className="flex items-center justify-between">
                         <span className="text-gray-500 text-xs">
-                          Renders Left {projectRendersLeft} / {FREE_PLAN_LIMIT}
+                         
                         </span>
                         <span className={`px-3 py-1 rounded-full text-xs font-bold ${
                           project.status === 'draft'

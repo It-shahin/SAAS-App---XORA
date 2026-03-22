@@ -18,7 +18,7 @@ const Hero = () => {
                             Create Videos with Ease
                         </h1>
                         <p className='max-w-440 mb-14 body-1 max-md:mb-10'>
-                            we designed XORA AI to be the most intuitive and 
+                            we designed Trimix AI to be the most intuitive and 
                             user-friendly video editing software on the market. 
                             With our powerful AI technology, you can create stunning videos in minutes, 
                             without any prior experience or technical skills. 

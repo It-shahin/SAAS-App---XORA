@@ -1,6 +1,10 @@
 import { useState } from 'react'
 import { account } from '../lib/appwrite'
 import { Link } from 'react-router-dom'
+import { getSafeAuthError } from '../lib/authErrors'
+
+const SUCCESS_MESSAGE =
+  'If an account exists for this email, a reset link has been sent. Check your inbox.'
 
 const ForgotPassword = () => {
   const [email, setEmail] = useState('')
@@ -15,13 +19,14 @@ const ForgotPassword = () => {
     setLoading(true)
 
     try {
-      await account.createRecovery(
-        email,
-        `${window.location.origin}/reset-password`
-      )
-      setSuccess('Recovery email sent! Check your inbox.')
+      await account.createRecovery(email.trim().toLowerCase(), `${window.location.origin}/reset-password`)
+      setSuccess(SUCCESS_MESSAGE)
     } catch (err) {
-      setError(err.message || 'Something went wrong. Please try again.')
+      if (String(err?.code || '').includes('user_not_found')) {
+        setSuccess(SUCCESS_MESSAGE)
+      } else {
+        setError(getSafeAuthError(err, 'Could not send reset link. Please try again.'))
+      }
     } finally {
       setLoading(false)
     }
@@ -29,10 +34,7 @@ const ForgotPassword = () => {
 
   return (
     <div className="min-h-screen flex items-center justify-center bg-s1">
-      <form
-        onSubmit={handleSubmit}
-        className="bg-s2 p-8 rounded-2xl w-full max-w-md flex flex-col gap-4"
-      >
+      <form onSubmit={handleSubmit} className="bg-s2 p-8 rounded-2xl w-full max-w-md flex flex-col gap-4">
         <h2 className="text-white text-2xl font-bold">Forgot password</h2>
         <p className="font-normal text-indigo-400">
           Enter your email and we&apos;ll send you a password reset link.
@@ -60,24 +62,21 @@ const ForgotPassword = () => {
             type="email"
             placeholder="Enter your email"
             value={email}
-            onChange={e => setEmail(e.target.value)}
+            onChange={(e) => setEmail(e.target.value)}
             required
           />
         </div>
 
         <button
-          className="flex w-full justify-center rounded-md bg-indigo-500 px-3 py-1.5 text-sm font-semibold text-white hover:bg-indigo-400 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-indigo-500"
+          className="flex w-full justify-center rounded-md bg-indigo-500 px-3 py-1.5 text-sm font-semibold text-white hover:bg-indigo-400 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-indigo-500 disabled:opacity-60 disabled:cursor-not-allowed"
           type="submit"
           disabled={loading}
         >
           {loading ? 'Sending...' : 'Send reset link'}
         </button>
 
-        <Link
-          to="/login"
-          className="font-semibold text-indigo-400 hover:text-indigo-300"
-        >
-          ← Back to login
+        <Link to="/login" className="font-semibold text-indigo-400 hover:text-indigo-300">
+          Back to login
         </Link>
       </form>
     </div>
@@ -85,3 +84,4 @@ const ForgotPassword = () => {
 }
 
 export default ForgotPassword
+

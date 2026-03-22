@@ -1,4 +1,5 @@
 import { createContext, useContext, useEffect, useState } from 'react'
+import { ID, Query } from 'appwrite'
 import { account, databases } from '../lib/appwrite'
 import { useAuth } from './AuthContext'
 
@@ -19,69 +20,66 @@ export const ProjectsProvider = ({ children }) => {
       setLoading(false)
       return
     }
+
+    setLoading(true)
     try {
       const result = await databases.listDocuments({
         databaseId: DATABASE_ID,
-        collectionId: COLLECTION_ID
+        collectionId: COLLECTION_ID,
+        queries: [Query.equal('userID', user.$id), Query.orderDesc('$createdAt')]
       })
-      const userProjects = result.documents.filter(doc => doc.userID === user.$id) // ← fixed typo
-      setProjects(userProjects)
+      setProjects(result.documents)
     } catch (error) {
       console.error('Failed to fetch projects:', error)
+      setProjects([])
     } finally {
       setLoading(false)
     }
   }
 
   const createProject = async (projectData) => {
-    try {
-      const result = await databases.createDocument({
-        databaseId: DATABASE_ID,
-        collectionId: COLLECTION_ID,
-        documentId: 'unique()',
-        data: {
-          title: projectData.title,
-          description: projectData.description,
-          style: projectData.style,
-          status: 'draft',
-          userID: user.$id,
-          mode: projectData.mode || 'text',
-          sourceImageUrl: projectData.imageUrl || '',
-          rendersUsed: 0  // ← initialize counter
-        }
-      })
-      await fetchProjects()
-      return result
-    } catch (error) {
-      console.error('Failed to create project:', error)
-      throw error
+    if (!user) {
+      throw new Error('You must be logged in to create a project.')
     }
+
+    const result = await databases.createDocument({
+      databaseId: DATABASE_ID,
+      collectionId: COLLECTION_ID,
+      documentId: ID.unique(),
+      data: {
+        title: projectData.title.trim(),
+        description: (projectData.description || '').trim(),
+        style: projectData.style,
+        status: 'draft',
+        userID: user.$id,
+        mode: projectData.mode || 'text',
+        sourceImageUrl: projectData.imageUrl || '',
+        rendersUsed: 0
+      }
+    })
+
+    await fetchProjects()
+    return result
   }
 
-  // ← moved INSIDE provider so it can access fetchProjects
   const incrementUserRenders = async () => {
-  const prefs = await account.getPrefs()
-  const current = prefs.rendersUsed || 0
-  await account.updatePrefs({ rendersUsed: current + 1 })
-}
+    const prefs = await account.getPrefs()
+    const current = Number(prefs?.rendersUsed || 0)
+    await account.updatePrefs({ ...prefs, rendersUsed: current + 1 })
+  }
 
-// Call this to get renders left
-const getUserRendersLeft = async () => {
-  const prefs = await account.getPrefs()
-  return FREE_PLAN_LIMIT - (prefs.rendersUsed || 0)
-}
+  const getUserRendersLeft = async () => {
+    const prefs = await account.getPrefs()
+    return FREE_PLAN_LIMIT - Number(prefs?.rendersUsed || 0)
+  }
 
   const deleteProject = async (projectId) => {
-    try {
-      await databases.deleteDocument({
-        databaseId: DATABASE_ID,
-        collectionId: COLLECTION_ID,
-        documentId: projectId
-      })
-      await fetchProjects()
-    } catch (error) {
-      console.error('Failed to delete project:', error)
-    }
+    await databases.deleteDocument({
+      databaseId: DATABASE_ID,
+      collectionId: COLLECTION_ID,
+      documentId: projectId
+    })
+    await fetchProjects()
   }
 
   useEffect(() => {
@@ -89,16 +87,21 @@ const getUserRendersLeft = async () => {
   }, [user])
 
   return (
-    <ProjectsContext.Provider value={{
-    projects,
-    loading,
-    createProject,
-    deleteProject,
-    incrementUserRenders  // ← add this
-  }}>
-    {children}
-  </ProjectsContext.Provider>
+    <ProjectsContext.Provider
+      value={{
+        projects,
+        loading,
+        createProject,
+        deleteProject,
+        incrementUserRenders,
+        getUserRendersLeft,
+        fetchProjects
+      }}
+    >
+      {children}
+    </ProjectsContext.Provider>
   )
 }
 
 export const useProjects = () => useContext(ProjectsContext)
+

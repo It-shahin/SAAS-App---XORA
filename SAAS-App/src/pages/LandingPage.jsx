@@ -1,6 +1,6 @@
 
 import Header from '../sections/Header.jsx';
-import Hero from '../sections/hero.jsx';
+import Hero from '../sections/Hero.jsx';
 import Features from '../sections/Features.jsx';
 import Pricing from '../sections/Pricing.jsx';
 import FAQ from '../sections/Faq.jsx';

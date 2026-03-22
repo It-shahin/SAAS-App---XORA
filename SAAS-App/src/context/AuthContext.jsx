@@ -15,12 +15,15 @@ export const AuthProvider = ({ children }) => {
   }, [])
 
   const signup = async (email, password, name) => {
-    await account.create(ID.unique(), email, password, name)
-    return login(email, password)
+    const normalizedEmail = email.trim().toLowerCase()
+    const safeName = name.trim()
+    await account.create(ID.unique(), normalizedEmail, password, safeName)
+    return login(normalizedEmail, password)
   }
 
   const login = async (email, password) => {
-    await account.createEmailPasswordSession(email, password)
+    const normalizedEmail = email.trim().toLowerCase()
+    await account.createEmailPasswordSession(normalizedEmail, password)
     const u = await account.get()
     setUser(u)
     return u

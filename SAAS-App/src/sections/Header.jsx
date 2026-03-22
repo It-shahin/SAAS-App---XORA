@@ -21,7 +21,17 @@ const NavLink = ({ title, setIsOpen }) => (
 const Header = () => {
   const [hasScrolled, setHasScrolled] = useState(false);
   const [isOpen, setIsOpen] = useState(false);
+  const [isLoggingOut, setIsLoggingOut] = useState(false);
   const { user, logout } = useAuth();
+
+  const handleLogout = async () => {
+    setIsLoggingOut(true);
+    try {
+      await logout();
+    } finally {
+      setIsLoggingOut(false);
+    }
+  };
 
   useEffect(() => {
     const handleScroll = () => {
@@ -44,14 +54,14 @@ const Header = () => {
 >
   <div className="container flex items-center h-14 max-lg:px-5 px-8">
     {/* Mobile Logo - Left aligned for hamburger space */}
-    <a className="lg:hidden cursor-pointer">
+    <Link to="/" className="lg:hidden cursor-pointer">
       <img 
         src="/images/xora.svg" 
         width={160} 
         height={55} 
-        alt="Xora" 
+        alt="Trimix AI" 
       />
-    </a>
+    </Link>
 
     {/* Desktop Layout: Left Nav | Center Logo | Right Auth */}
     <div className="hidden lg:flex w-full items-center justify-between mx-auto max-w-6xl">
@@ -76,7 +86,7 @@ const Header = () => {
           src="/images/xora.svg"
           width={160}
           height={55}
-          alt="Xora"
+          alt="Trimix AI"
         />
       </LinkScroll>
 
@@ -92,10 +102,11 @@ const Header = () => {
             </Link>
             <div className="w-1 h-1 bg-current rounded-full dot" />
             <button
-              onClick={logout}
+              onClick={handleLogout}
+              disabled={isLoggingOut}
               className="base-bold text-p4 uppercase transition-colors duration-500 cursor-pointer hover:text-p1"
             >
-              Logout
+              {isLoggingOut ? "Logging out..." : "Logout"}
             </button>
           </>
         ) : (
