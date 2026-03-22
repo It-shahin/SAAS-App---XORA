@@ -1,12 +1,13 @@
 import { useState, useEffect } from 'react'
 import { useParams, useNavigate, Link } from 'react-router-dom'
-import { databases } from '../lib/appwrite'
+import { databases, ID } from '../lib/appwrite'
 import { submitRender, submitImageRender, pollRender } from '../lib/shotstack'
 import { useProjects } from '../context/ProjectsContext'
 import { useAuth } from '../context/AuthContext'
 
 const DATABASE_ID = '69ba0d06002eebdcbb81'
 const COLLECTION_ID = 'projects'
+const SHARE_COLLECTION_ID = 'shares'
 
 const ProjectDetail = () => {
   const { id } = useParams()
@@ -19,6 +20,9 @@ const ProjectDetail = () => {
   const [showConfirm, setShowConfirm] = useState(false)
   const [generating, setGenerating] = useState(false)
   const [genError, setGenError] = useState('')
+  const [shareLoading, setShareLoading] = useState(false)
+  const [shareCopied, setShareCopied] = useState(false)
+  const [shareError, setShareError] = useState('')
 
   const { deleteProject, incrementUserRenders, getUserRendersLeft } = useProjects()
 
@@ -141,6 +145,64 @@ const ProjectDetail = () => {
     }
   }
 
+  const copyToClipboard = async (text) => {
+    if (navigator?.clipboard?.writeText) {
+      await navigator.clipboard.writeText(text)
+      return
+    }
+
+    const input = document.createElement('input')
+    input.value = text
+    input.style.position = 'fixed'
+    input.style.opacity = '0'
+    document.body.appendChild(input)
+    input.select()
+    document.execCommand('copy')
+    document.body.removeChild(input)
+  }
+
+  const handleShare = async () => {
+    if (!project?.videoUrl) {
+      setShareError('Video is not ready yet.')
+      return
+    }
+
+    setShareError('')
+    setShareLoading(true)
+    try {
+      const payload = {
+        projectId: id,
+        title: project.title,
+        videoUrl: project.videoUrl
+      }
+
+      try {
+        await databases.updateDocument({
+          databaseId: DATABASE_ID,
+          collectionId: SHARE_COLLECTION_ID,
+          documentId: id,
+          data: payload
+        })
+      } catch {
+        await databases.createDocument({
+          databaseId: DATABASE_ID,
+          collectionId: SHARE_COLLECTION_ID,
+          documentId: id || ID.unique(),
+          data: payload
+        })
+      }
+
+      const shareUrl = `${window.location.origin}/share/${id}`
+      await copyToClipboard(shareUrl)
+      setShareCopied(true)
+      setTimeout(() => setShareCopied(false), 3000)
+    } catch {
+      setShareError('Could not create share link. Please try again.')
+    } finally {
+      setShareLoading(false)
+    }
+  }
+
   const styleLabels = {
     clean: 'Clean & Modern',
     bold: 'Bold & Dynamic',
@@ -216,6 +278,7 @@ const ProjectDetail = () => {
           <div className="bg-s2 border border-green-500/20 rounded-2xl p-6 mb-6">
             <p className="text-p3 text-xs uppercase tracking-widest mb-4">Generated Video</p>
             <video controls className="w-full rounded-xl" src={project.videoUrl} />
+            {shareError && <p className="text-red-400 text-sm mt-3">{shareError}</p>}
             <div className="flex gap-4 mt-4">
               <a
                 href={project.videoUrl}
@@ -226,6 +289,13 @@ const ProjectDetail = () => {
               >
                 Download Video
               </a>
+              <button
+                onClick={handleShare}
+                disabled={shareLoading}
+                className="border border-s3/20 text-p3 hover:text-p1 px-5 py-2.5 rounded-xl text-sm transition-colors disabled:opacity-60 disabled:cursor-not-allowed"
+              >
+                {shareCopied ? 'Link copied!' : shareLoading ? 'Creating link...' : 'Share'}
+              </button>
               <button
                 onClick={handleGenerate}
                 disabled={generating}
@@ -293,3 +363,4 @@ const ProjectDetail = () => {
 }
 
 export default ProjectDetail
+

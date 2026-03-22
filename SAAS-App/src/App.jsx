@@ -10,6 +10,7 @@ import ChangePassword from './pages/ChangePassword'
 import NewProject from './pages/NewProject'
 import ProjectDetail from './pages/ProjectDetail'
 import EditProject from './pages/EditProject'
+import ShareView from './pages/ShareView'
 
 
 const App = () => (
@@ -34,6 +35,7 @@ const App = () => (
   <Route path="/projects/:id/edit" element={
   <ProtectedRoute><EditProject /></ProtectedRoute>
 } />
+<Route path="/share/:projectId" element={<ShareView />} />
 </Routes>
 
 )
