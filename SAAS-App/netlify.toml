@@ -14,8 +14,8 @@
   status = 200
 
 [[redirects]]
-  from = "/api/render/:id"
-  to = "/.netlify/functions/render-status?id=:id"
+  from = "/api/render/status"
+  to = "/.netlify/functions/render-status"
   status = 200
 
 [[redirects]]

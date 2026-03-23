@@ -35,6 +35,6 @@ export const submitImageRender = async (imageUrl, motionPrompt) => {
 }
 
 export const pollRender = async (renderId) => {
-  const data = await request(`/api/render/${renderId}`)
+  const data = await request(`/api/render/status?id=${encodeURIComponent(renderId)}`)
   return { status: data.status, url: data.url }
 }

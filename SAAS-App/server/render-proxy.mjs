@@ -181,8 +181,11 @@ const server = http.createServer(async (req, res) => {
       return sendJson(res, 200, { renderId })
     }
 
-    if (req.method === 'GET' && url.pathname.startsWith('/api/render/')) {
-      const renderId = url.pathname.replace('/api/render/', '')
+    if (req.method === 'GET' && (url.pathname.startsWith('/api/render/') || url.pathname === '/api/render/status')) {
+      const renderId = url.pathname === '/api/render/status'
+        ? url.searchParams.get('id')
+        : url.pathname.replace('/api/render/', '')
+      if (!renderId) return sendJson(res, 400, { message: 'Missing render id' })
       try {
         const response = await fetch(`${EDIT_URL}/render/${renderId}`, {
           headers: { 'x-api-key': SHOTSTACK_API_KEY }
