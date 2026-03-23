@@ -97,7 +97,8 @@ const buildTimeline = (title, description, style) => {
               },
               start: 0,
               length: titleLength,
-              position: 'top',
+              position: 'center',
+              offset: { x: 0, y: -0.32 },
               transition: { in: 'fade', out: 'fade' }
             }
           ]
@@ -113,7 +114,8 @@ const buildTimeline = (title, description, style) => {
             },
             start: firstSceneStart + i * sceneStep,
             length: sceneLength,
-            position: 'bottom',
+            position: 'center',
+            offset: { x: 0, y: 0.22 },
             transition: { in: 'fade', out: 'fade' }
           }))
         }
