@@ -91,13 +91,13 @@ const buildTimeline = (title, description, style) => {
               asset: {
                 type: 'html',
                 html: `<p>${escapeHtml(title)}</p>`,
-                css: `p { font-family: 'Open Sans'; font-size: 64px; font-weight: 800; color: ${palette.accent}; text-align: center; }`,
+                css: `p { font-family: 'Open Sans'; font-size: 64px; font-weight: 800; color: ${palette.accent}; text-align: center; margin: 0; padding-top: 24px; }`,
                 width: 1100,
-                height: 200
+                height: 220
               },
               start: 0,
               length: titleLength,
-              position: 'center',
+              position: 'top',
               transition: { in: 'fade', out: 'fade' }
             }
           ]
@@ -107,13 +107,13 @@ const buildTimeline = (title, description, style) => {
             asset: {
               type: 'html',
               html: `<p>${escapeHtml(String(sentence || '').trim())}</p>`,
-              css: `p { font-family: 'Open Sans'; font-size: 40px; color: ${palette.text}; text-align: center; line-height: 1.4; }`,
+              css: `p { font-family: 'Open Sans'; font-size: 40px; color: ${palette.text}; text-align: center; line-height: 1.4; margin: 0; padding-bottom: 40px; }`,
               width: 1000,
               height: 300
             },
             start: firstSceneStart + i * sceneStep,
             length: sceneLength,
-            position: 'center',
+            position: 'bottom',
             transition: { in: 'fade', out: 'fade' }
           }))
         }
