@@ -11,6 +11,8 @@ import NewProject from './pages/NewProject'
 import ProjectDetail from './pages/ProjectDetail'
 import EditProject from './pages/EditProject'
 import ShareView from './pages/ShareView'
+import Billing from './pages/Billing'
+import Assets from './pages/Assets'
 
 
 const App = () => (
@@ -36,6 +38,12 @@ const App = () => (
   <ProtectedRoute><EditProject /></ProtectedRoute>
 } />
 <Route path="/share/:projectId" element={<ShareView />} />
+<Route path="/billing" element={
+  <ProtectedRoute><Billing /></ProtectedRoute>
+} />
+<Route path="/assets" element={
+  <ProtectedRoute><Assets /></ProtectedRoute>
+} />
 </Routes>
 
 )

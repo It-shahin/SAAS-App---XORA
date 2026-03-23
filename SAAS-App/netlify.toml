@@ -1,0 +1,24 @@
+[build]
+  command = "npm run build"
+  publish = "dist"
+  functions = "netlify/functions"
+
+[[redirects]]
+  from = "/api/render/text"
+  to = "/.netlify/functions/render-text"
+  status = 200
+
+[[redirects]]
+  from = "/api/render/image"
+  to = "/.netlify/functions/render-image"
+  status = 200
+
+[[redirects]]
+  from = "/api/render/:id"
+  to = "/.netlify/functions/render-status?id=:id"
+  status = 200
+
+[[redirects]]
+  from = "/*"
+  to = "/index.html"
+  status = 200

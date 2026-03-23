@@ -1,18 +1,30 @@
-import { useState, useEffect } from 'react'
-import { useParams, useNavigate, Link } from 'react-router-dom'
+import { useEffect, useMemo, useState } from 'react'
+import { Link, useNavigate, useParams } from 'react-router-dom'
 import { databases, ID } from '../lib/appwrite'
-import { submitRender, submitImageRender, pollRender } from '../lib/shotstack'
-import { useProjects } from '../context/ProjectsContext'
+import { submitImageRender, submitRender, pollRender } from '../lib/shotstack'
 import { useAuth } from '../context/AuthContext'
+import { useProjects } from '../context/ProjectsContext'
+import {
+  addComment,
+  getCollaborators,
+  getComments,
+  getScenes,
+  saveCollaborators
+} from '../lib/collaboration'
+import {
+  APPWRITE_DATABASE_ID,
+  APPWRITE_PROJECTS_COLLECTION_ID,
+  APPWRITE_SHARES_COLLECTION_ID
+} from '../lib/config'
 
-const DATABASE_ID = '69ba0d06002eebdcbb81'
-const COLLECTION_ID = 'projects'
-const SHARE_COLLECTION_ID = 'shares'
+const QUEUE_STAGES = ['Queued', 'Preparing timeline', 'Rendering', 'Finalizing', 'Completed']
 
 const ProjectDetail = () => {
   const { id } = useParams()
   const navigate = useNavigate()
   const { user } = useAuth()
+  const { deleteProject, incrementUserRenders, getUserRendersLeft } = useProjects()
+
   const [project, setProject] = useState(null)
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState('')
@@ -23,25 +35,33 @@ const ProjectDetail = () => {
   const [shareLoading, setShareLoading] = useState(false)
   const [shareCopied, setShareCopied] = useState(false)
   const [shareError, setShareError] = useState('')
+  const [shareExpiryHours, setShareExpiryHours] = useState(72)
+  const [sharePassword, setSharePassword] = useState('')
+  const [disableDownload, setDisableDownload] = useState(false)
+  const [inviteEmail, setInviteEmail] = useState('')
+  const [commentText, setCommentText] = useState('')
 
-  const { deleteProject, incrementUserRenders, getUserRendersLeft } = useProjects()
+  const [scenes, setScenes] = useState([])
+  const [collaborators, setCollaborators] = useState([])
+  const [comments, setComments] = useState([])
+  const [queueStage, setQueueStage] = useState('Queued')
 
   const fetchProject = async () => {
     if (!user) return
-
     try {
       const result = await databases.getDocument({
-        databaseId: DATABASE_ID,
-        collectionId: COLLECTION_ID,
+        databaseId: APPWRITE_DATABASE_ID,
+        collectionId: APPWRITE_PROJECTS_COLLECTION_ID,
         documentId: id
       })
-
       if (result.userID !== user.$id) {
         setError('You do not have access to this project.')
         return
       }
-
       setProject(result)
+      setScenes(await getScenes(id))
+      setCollaborators(await getCollaborators(id))
+      setComments(await getComments(id))
       setError('')
     } catch {
       setError('Project not found.')
@@ -54,34 +74,55 @@ const ProjectDetail = () => {
     fetchProject()
   }, [id, user?.$id])
 
+  useEffect(() => {
+    if (project?.status === 'completed' || project?.videoUrl) {
+      setQueueStage('Completed')
+    } else if (project?.status === 'processing') {
+      setQueueStage('Rendering')
+    } else {
+      setQueueStage('Queued')
+    }
+  }, [project?.status, project?.videoUrl])
+
+  const derivedScenes = useMemo(() => {
+    if (scenes.length > 0) return scenes
+    return (project?.description || '')
+      .split(/[.!?]+/)
+      .map((text, idx) => ({ id: `${idx + 1}`, text: text.trim(), duration: 4 }))
+      .filter((scene) => scene.text)
+  }, [scenes, project?.description])
+
+  const queueStageIndex = Math.max(0, QUEUE_STAGES.indexOf(queueStage))
+
   const startPolling = async (renderId) => {
     const interval = setInterval(async () => {
       try {
         const { status, url } = await pollRender(renderId)
-
         if (status === 'done') {
           clearInterval(interval)
           await databases.updateDocument({
-            databaseId: DATABASE_ID,
-            collectionId: COLLECTION_ID,
+            databaseId: APPWRITE_DATABASE_ID,
+            collectionId: APPWRITE_PROJECTS_COLLECTION_ID,
             documentId: id,
             data: { status: 'completed', videoUrl: url }
           })
           await incrementUserRenders()
           await fetchProject()
           setGenerating(false)
-        }
-
-        if (status === 'failed') {
+          setQueueStage('Completed')
+        } else if (status === 'failed') {
           clearInterval(interval)
           await databases.updateDocument({
-            databaseId: DATABASE_ID,
-            collectionId: COLLECTION_ID,
+            databaseId: APPWRITE_DATABASE_ID,
+            collectionId: APPWRITE_PROJECTS_COLLECTION_ID,
             documentId: id,
             data: { status: 'draft' }
           })
           setGenError('Render failed. Please try again.')
           setGenerating(false)
+          setQueueStage('Queued')
+        } else {
+          setQueueStage('Rendering')
         }
       } catch {
         clearInterval(interval)
@@ -93,44 +134,44 @@ const ProjectDetail = () => {
 
   const handleGenerate = async () => {
     setGenError('')
-
     const rendersLeft = await getUserRendersLeft()
     if (rendersLeft <= 0) {
-      setGenError('You reached your free render limit. Please upgrade to continue.')
+      setGenError('You reached your current render limit. Upgrade from Billing.')
       return
     }
 
     setGenerating(true)
+    setQueueStage('Preparing timeline')
+
     try {
       await databases.updateDocument({
-        databaseId: DATABASE_ID,
-        collectionId: COLLECTION_ID,
+        databaseId: APPWRITE_DATABASE_ID,
+        collectionId: APPWRITE_PROJECTS_COLLECTION_ID,
         documentId: id,
         data: { status: 'processing' }
       })
-      await fetchProject()
 
+      const timelineText = derivedScenes.map((scene) => scene.text).join('. ')
       let renderId
       if (project.mode === 'image') {
-        renderId = await submitImageRender(
-          project.sourceImageUrl,
-          project.description || 'Cinematic slow camera movement'
-        )
+        renderId = await submitImageRender(project.sourceImageUrl, timelineText || 'Cinematic slow camera movement')
       } else {
-        renderId = await submitRender(project.title, project.description, project.style || 'clean')
+        renderId = await submitRender(project.title, timelineText || project.description, project.style || 'clean')
       }
 
+      setQueueStage('Rendering')
       await databases.updateDocument({
-        databaseId: DATABASE_ID,
-        collectionId: COLLECTION_ID,
+        databaseId: APPWRITE_DATABASE_ID,
+        collectionId: APPWRITE_PROJECTS_COLLECTION_ID,
         documentId: id,
         data: { renderID: renderId }
       })
-
+      await fetchProject()
       startPolling(renderId)
     } catch {
       setGenError('Failed to start generation. Please try again.')
       setGenerating(false)
+      setQueueStage('Queued')
     }
   }
 
@@ -146,53 +187,56 @@ const ProjectDetail = () => {
   }
 
   const copyToClipboard = async (text) => {
-    if (navigator?.clipboard?.writeText) {
-      await navigator.clipboard.writeText(text)
-      return
-    }
-
+    if (navigator?.clipboard?.writeText) return navigator.clipboard.writeText(text)
     const input = document.createElement('input')
     input.value = text
-    input.style.position = 'fixed'
-    input.style.opacity = '0'
     document.body.appendChild(input)
     input.select()
     document.execCommand('copy')
     document.body.removeChild(input)
   }
 
-  const handleShare = async () => {
-    if (!project?.videoUrl) {
-      setShareError('Video is not ready yet.')
-      return
-    }
+  const hashPassword = async (text) => {
+    const data = new TextEncoder().encode(text)
+    const digest = await crypto.subtle.digest('SHA-256', data)
+    return Array.from(new Uint8Array(digest)).map((b) => b.toString(16).padStart(2, '0')).join('')
+  }
 
+  const handleShare = async () => {
+    if (!project?.videoUrl) return setShareError('Video is not ready yet.')
     setShareError('')
     setShareLoading(true)
     try {
       const payload = {
         projectId: id,
         title: project.title,
-        videoUrl: project.videoUrl
+        videoUrl: project.videoUrl,
+        metadata: JSON.stringify({
+          scenes: derivedScenes,
+          comments: comments.map((c) => ({ id: c.$id || c.id, text: c.text, author: c.author }))
+        })
       }
-
       try {
         await databases.updateDocument({
-          databaseId: DATABASE_ID,
-          collectionId: SHARE_COLLECTION_ID,
+          databaseId: APPWRITE_DATABASE_ID,
+          collectionId: APPWRITE_SHARES_COLLECTION_ID,
           documentId: id,
           data: payload
         })
       } catch {
         await databases.createDocument({
-          databaseId: DATABASE_ID,
-          collectionId: SHARE_COLLECTION_ID,
+          databaseId: APPWRITE_DATABASE_ID,
+          collectionId: APPWRITE_SHARES_COLLECTION_ID,
           documentId: id || ID.unique(),
           data: payload
         })
       }
 
-      const shareUrl = `${window.location.origin}/share/${id}`
+      const params = new URLSearchParams()
+      params.set('exp', String(Date.now() + shareExpiryHours * 3600 * 1000))
+      if (disableDownload) params.set('nodl', '1')
+      if (sharePassword.trim()) params.set('phash', await hashPassword(sharePassword.trim()))
+      const shareUrl = `${window.location.origin}/share/${id}?${params.toString()}`
       await copyToClipboard(shareUrl)
       setShareCopied(true)
       setTimeout(() => setShareCopied(false), 3000)
@@ -203,157 +247,128 @@ const ProjectDetail = () => {
     }
   }
 
-  const styleLabels = {
-    clean: 'Clean & Modern',
-    bold: 'Bold & Dynamic',
-    minimal: 'Minimal',
-    corporate: 'Corporate'
+  const addCollaborator = async () => {
+    const email = inviteEmail.trim().toLowerCase()
+    if (!email) return
+    if (collaborators.includes(email)) return
+    const next = [...collaborators, email]
+    await saveCollaborators(id, next)
+    setCollaborators(next)
+    setInviteEmail('')
+    const inviteLink = `${window.location.origin}/share/${id}`
+    window.open(`mailto:${email}?subject=Trimix AI Collaboration Invite&body=You were invited to collaborate: ${inviteLink}`)
   }
 
-  if (loading) {
-    return (
-      <div className="min-h-screen bg-s1 flex items-center justify-center">
-        <p className="text-p3">Loading project...</p>
-      </div>
-    )
+  const addProjectComment = async () => {
+    const text = commentText.trim()
+    if (!text) return
+    await addComment(id, text, user?.email || 'owner')
+    setCommentText('')
+    setComments(await getComments(id))
   }
 
-  if (error || !project) {
-    return (
-      <div className="min-h-screen bg-s1 flex flex-col items-center justify-center gap-4">
-        <p className="text-red-400">{error || 'Project not found.'}</p>
-        <Link to="/dashboard" className="text-p1 hover:underline">
-          Back to dashboard
-        </Link>
-      </div>
-    )
-  }
+  if (loading) return <div className="min-h-screen bg-s1 flex items-center justify-center"><p className="text-p3">Loading project...</p></div>
+  if (error || !project) return <div className="min-h-screen bg-s1 flex flex-col items-center justify-center gap-4"><p className="text-red-400">{error || 'Project not found.'}</p><Link to="/dashboard" className="text-p1 hover:underline">Back to dashboard</Link></div>
 
   return (
     <div className="min-h-screen bg-s1 text-white">
       <header className="border-b border-s3/20 px-8 py-4 flex items-center justify-between">
-        <Link to="/">
-          <img src="/images/xora.svg" width={100} height={40} alt="Trimix AI" />
-        </Link>
-        <Link to="/dashboard" className="text-p3 text-sm hover:text-p1 transition-colors">
-          Dashboard
-        </Link>
+        <Link to="/"><img src="/images/xora.svg" width={100} height={40} alt="Trimix AI" /></Link>
+        <Link to="/dashboard" className="text-p3 text-sm hover:text-p1 transition-colors">Dashboard</Link>
       </header>
 
-      <div className="max-w-3xl mx-auto px-8 py-12">
-        <div className="flex items-start justify-between gap-4 mb-8">
-          <div>
-            <p className="text-p3 text-xs uppercase tracking-widest mb-2">Project</p>
-            <h1 className="text-4xl font-bold">{project.title}</h1>
-          </div>
-          <span
-            className={`mt-2 px-3 py-1 rounded-full text-xs font-bold ${
-              project.status === 'draft'
-                ? 'bg-s3/20 text-p3'
-                : project.status === 'processing'
-                  ? 'bg-yellow-500/20 text-yellow-400'
-                  : project.status === 'completed'
-                    ? 'bg-green-500/20 text-green-400'
-                    : 'bg-red-500/20 text-red-400'
-            }`}
-          >
-            {project.status}
-          </span>
+      <div className="max-w-5xl mx-auto px-8 py-12 space-y-6">
+        <div className="flex items-start justify-between gap-4">
+          <div><p className="text-p3 text-xs uppercase tracking-widest mb-2">Project</p><h1 className="text-4xl font-bold">{project.title}</h1></div>
+          <span className="mt-2 px-3 py-1 rounded-full text-xs font-bold bg-s3/20 text-p3">{project.status}</span>
         </div>
 
-        <div className="bg-s2 border border-s3/20 rounded-2xl p-8 flex flex-col gap-6 mb-6">
-          <div>
-            <p className="text-p3 text-xs uppercase tracking-widest mb-2">Script / Description</p>
-            <p className="text-white leading-relaxed whitespace-pre-wrap">{project.description}</p>
+        <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+          <div className="bg-s2 border border-s3/20 rounded-2xl p-6">
+            <p className="text-p3 text-xs uppercase tracking-widest mb-3">Render Queue</p>
+            <div className="space-y-2">
+              {QUEUE_STAGES.map((stage, idx) => (
+                <div key={stage} className="flex items-center justify-between border border-white/10 rounded-lg px-3 py-2">
+                  <span className="text-sm">{stage}</span>
+                  <span className={`text-xs ${idx <= queueStageIndex ? 'text-green-400' : 'text-gray-500'}`}>
+                    {idx < queueStageIndex ? 'Done' : idx === queueStageIndex ? 'Active' : 'Pending'}
+                  </span>
+                </div>
+              ))}
+            </div>
           </div>
-          <div className="flex flex-col sm:flex-row gap-6">
-            <div>
-              <p className="text-p3 text-xs uppercase tracking-widest mb-2">Style</p>
-              <p className="text-white font-bold">{styleLabels[project.style] || project.style || '-'}</p>
+
+          <div className="bg-s2 border border-s3/20 rounded-2xl p-6">
+            <p className="text-p3 text-xs uppercase tracking-widest mb-3">Scenes</p>
+            <div className="space-y-2 max-h-64 overflow-auto">
+              {derivedScenes.map((scene, idx) => (
+                <div key={scene.id || idx} className="border border-white/10 rounded-lg px-3 py-2">
+                  <p className="text-xs text-gray-400 mb-1">Scene {idx + 1} • {scene.duration || 4}s</p>
+                  <p className="text-sm">{scene.text}</p>
+                </div>
+              ))}
             </div>
           </div>
         </div>
 
-        {project.status === 'completed' && project.videoUrl && (
-          <div className="bg-s2 border border-green-500/20 rounded-2xl p-6 mb-6">
-            <p className="text-p3 text-xs uppercase tracking-widest mb-4">Generated Video</p>
-            <video controls className="w-full rounded-xl" src={project.videoUrl} />
-            {shareError && <p className="text-red-400 text-sm mt-3">{shareError}</p>}
-            <div className="flex gap-4 mt-4">
-              <a
-                href={project.videoUrl}
-                download
-                target="_blank"
-                rel="noreferrer"
-                className="bg-p1 hover:bg-p1/80 text-white font-bold px-6 py-2.5 rounded-xl text-sm transition-colors"
-              >
-                Download Video
-              </a>
-              <button
-                onClick={handleShare}
-                disabled={shareLoading}
-                className="border border-s3/20 text-p3 hover:text-p1 px-5 py-2.5 rounded-xl text-sm transition-colors disabled:opacity-60 disabled:cursor-not-allowed"
-              >
-                {shareCopied ? 'Link copied!' : shareLoading ? 'Creating link...' : 'Share'}
-              </button>
-              <button
-                onClick={handleGenerate}
-                disabled={generating}
-                className="text-p3 text-sm hover:text-p1 border border-s3/20 px-5 py-2.5 rounded-xl transition-colors disabled:opacity-50"
-              >
-                {generating ? 'Regenerating...' : 'Regenerate'}
-              </button>
-            </div>
-          </div>
-        )}
+        <div className="bg-s2 border border-green-500/20 rounded-2xl p-6">
+          <p className="text-p3 text-xs uppercase tracking-widest mb-3">Generated Video</p>
+          {project.videoUrl ? <video controls className="w-full rounded-xl" src={project.videoUrl} /> : <p className="text-gray-400 text-sm">No video yet.</p>}
+          {shareError && <p className="text-red-400 text-sm mt-3">{shareError}</p>}
 
-        {project.status !== 'completed' && (
-          <div className="bg-p1/10 border border-p1/30 rounded-2xl p-8 mb-6">
-            {genError && (
-              <div className="bg-red-500/10 border border-red-500/30 rounded-xl px-4 py-3 mb-4">
-                <p className="text-red-400 text-sm">{genError}</p>
-              </div>
-            )}
-            <button
-              onClick={handleGenerate}
-              disabled={generating || project.status === 'processing'}
-              className="bg-p1 hover:bg-p1/80 text-white font-bold px-8 py-3 rounded-xl transition-colors disabled:opacity-60 disabled:cursor-not-allowed"
-            >
-              {generating || project.status === 'processing' ? 'Generating...' : 'Generate Video'}
+          <div className="grid grid-cols-1 md:grid-cols-3 gap-3 mt-4">
+            <input type="number" min={1} value={shareExpiryHours} onChange={(e) => setShareExpiryHours(Number(e.target.value || 72))} className="rounded-md bg-white/5 px-3 py-2 text-sm text-white outline outline-1 outline-white/10" />
+            <input type="password" placeholder="Share password (optional)" value={sharePassword} onChange={(e) => setSharePassword(e.target.value)} className="rounded-md bg-white/5 px-3 py-2 text-sm text-white outline outline-1 outline-white/10" />
+            <label className="inline-flex items-center gap-2 text-sm text-gray-300"><input type="checkbox" checked={disableDownload} onChange={(e) => setDisableDownload(e.target.checked)} /> Disable download</label>
+          </div>
+
+          <div className="flex gap-3 mt-4 flex-wrap">
+            <button onClick={handleGenerate} disabled={generating} className="bg-p1 hover:bg-p1/80 text-white font-bold px-6 py-2.5 rounded-xl disabled:opacity-60">
+              {generating ? 'Generating...' : 'Generate / Regenerate'}
             </button>
+            <button onClick={handleShare} disabled={shareLoading || !project.videoUrl} className="border border-s3/20 text-p3 hover:text-p1 px-5 py-2.5 rounded-xl text-sm disabled:opacity-60">
+              {shareCopied ? 'Link copied!' : shareLoading ? 'Creating link...' : 'Share'}
+            </button>
+            {genError && <p className="text-red-400 text-sm">{genError}</p>}
           </div>
-        )}
+        </div>
+
+        <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+          <div className="bg-s2 border border-s3/20 rounded-2xl p-6">
+            <p className="text-p3 text-xs uppercase tracking-widest mb-3">Collaborators</p>
+            <div className="flex gap-2 mb-3">
+              <input value={inviteEmail} onChange={(e) => setInviteEmail(e.target.value)} placeholder="teammate@email.com" className="flex-1 rounded-md bg-white/5 px-3 py-2 text-sm text-white outline outline-1 outline-white/10" />
+              <button onClick={addCollaborator} className="bg-indigo-500 hover:bg-indigo-600 px-4 py-2 rounded-md text-sm font-semibold">Invite</button>
+            </div>
+            <p className="text-xs text-gray-500 mb-2">No SMTP service configured yet, so invite opens your email client.</p>
+            <ul className="space-y-2">{collaborators.map((email) => <li key={email} className="text-sm border border-white/10 rounded-md px-3 py-2">{email}</li>)}</ul>
+          </div>
+
+          <div className="bg-s2 border border-s3/20 rounded-2xl p-6">
+            <p className="text-p3 text-xs uppercase tracking-widest mb-3">Comments</p>
+            <div className="flex gap-2 mb-3">
+              <input value={commentText} onChange={(e) => setCommentText(e.target.value)} placeholder="Leave feedback..." className="flex-1 rounded-md bg-white/5 px-3 py-2 text-sm text-white outline outline-1 outline-white/10" />
+              <button onClick={addProjectComment} className="bg-indigo-500 hover:bg-indigo-600 px-4 py-2 rounded-md text-sm font-semibold">Add</button>
+            </div>
+            <ul className="space-y-2 max-h-56 overflow-auto">
+              {comments.map((comment) => (
+                <li key={comment.$id} className="border border-white/10 rounded-md px-3 py-2">
+                  <p className="text-sm">{comment.text}</p>
+                  <p className="text-xs text-gray-500 mt-1">{comment.author}</p>
+                </li>
+              ))}
+            </ul>
+          </div>
+        </div>
 
         <div className="flex items-center justify-between">
-          <Link
-            to={`/projects/${id}/edit`}
-            className="text-p3 text-sm hover:text-p1 transition-colors border border-s3/20 px-5 py-2.5 rounded-xl"
-          >
-            Edit Project
-          </Link>
-
+          <Link to={`/projects/${id}/edit`} className="text-p3 text-sm hover:text-p1 transition-colors border border-s3/20 px-5 py-2.5 rounded-xl">Edit Project</Link>
           {!showConfirm ? (
-            <button
-              onClick={() => setShowConfirm(true)}
-              className="text-red-400 text-sm hover:text-red-300 transition-colors border border-red-500/20 px-5 py-2.5 rounded-xl"
-            >
-              Delete Project
-            </button>
+            <button onClick={() => setShowConfirm(true)} className="text-red-400 text-sm hover:text-red-300 border border-red-500/20 px-5 py-2.5 rounded-xl">Delete Project</button>
           ) : (
             <div className="flex items-center gap-3">
-              <button
-                onClick={() => setShowConfirm(false)}
-                className="text-p3 text-sm hover:text-p1 px-4 py-2 rounded-xl border border-s3/20 transition-colors"
-              >
-                Cancel
-              </button>
-              <button
-                onClick={handleDelete}
-                disabled={deleting}
-                className="bg-red-500/20 hover:bg-red-500/40 text-red-400 text-sm font-bold px-4 py-2 rounded-xl transition-colors disabled:opacity-50"
-              >
-                {deleting ? 'Deleting...' : 'Yes, delete'}
-              </button>
+              <button onClick={() => setShowConfirm(false)} className="text-p3 text-sm px-4 py-2 rounded-xl border border-s3/20">Cancel</button>
+              <button onClick={handleDelete} disabled={deleting} className="bg-red-500/20 text-red-400 text-sm font-bold px-4 py-2 rounded-xl disabled:opacity-50">{deleting ? 'Deleting...' : 'Yes, delete'}</button>
             </div>
           )}
         </div>

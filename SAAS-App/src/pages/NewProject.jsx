@@ -1,7 +1,8 @@
-import { useState } from 'react'
+import { useEffect, useState } from 'react'
 import { useProjects } from '../context/ProjectsContext'
 import { Link, useNavigate } from 'react-router-dom'
 import { uploadImage } from '../lib/upload'
+import { listAssets } from '../lib/collaboration'
 
 const NewProject = () => {
   const { createProject } = useProjects()
@@ -18,6 +19,7 @@ const NewProject = () => {
   const [imagePreview, setImagePreview] = useState(null)
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState('')
+  const [savedAssets, setSavedAssets] = useState([])
   const MAX_IMAGE_SIZE_BYTES = 10 * 1024 * 1024
   const ALLOWED_TYPES = ['image/jpeg', 'image/png', 'image/webp']
 
@@ -27,6 +29,15 @@ const NewProject = () => {
     { value: 'minimal', label: 'Minimal' },
     { value: 'corporate', label: 'Corporate' }
   ]
+
+  const loadSavedAssets = async () => {
+    const docs = await listAssets()
+    setSavedAssets(docs.map((doc) => ({ id: doc.$id, name: doc.name, url: doc.url })))
+  }
+
+  useEffect(() => {
+    loadSavedAssets()
+  }, [])
 
   const handleImageChange = (e) => {
     const file = e.target.files[0]
@@ -42,6 +53,7 @@ const NewProject = () => {
     setError('')
     setImageFile(file)
     setImagePreview(URL.createObjectURL(file))
+    setFormData({ ...formData, imageUrl: '' })
   }
 
   const handleDrop = (e) => {
@@ -59,6 +71,7 @@ const NewProject = () => {
     setError('')
     setImageFile(file)
     setImagePreview(URL.createObjectURL(file))
+    setFormData({ ...formData, imageUrl: '' })
   }
 
   const handleModeSwitch = (newMode) => {
@@ -85,7 +98,9 @@ const NewProject = () => {
     try {
       let sourceImageUrl = ''
 
-      if (mode === 'image' && imageFile) {
+      if (mode === 'image' && formData.imageUrl) {
+        sourceImageUrl = formData.imageUrl
+      } else if (mode === 'image' && imageFile) {
         sourceImageUrl = await uploadImage(imageFile)
       }
 
@@ -206,6 +221,31 @@ const NewProject = () => {
           {mode === 'image' && (
             <>
               <div>
+                {savedAssets.length > 0 && (
+                  <div className="mb-4">
+                    <label className="block text-sm font-medium text-gray-100 mb-2">Use from Asset Library</label>
+                    <select
+                      className="block w-full rounded-md bg-white/5 px-3 py-2 text-sm text-white outline outline-1 outline-white/10"
+                      defaultValue=""
+                      onChange={(e) => {
+                        const chosen = savedAssets.find((a) => a.id === e.target.value)
+                        if (chosen) {
+                          setImageFile(null)
+                          setImagePreview(chosen.url)
+                          setFormData({ ...formData, imageUrl: chosen.url })
+                        }
+                      }}
+                    >
+                      <option value="">Select an existing asset...</option>
+                      {savedAssets.map((asset) => (
+                        <option key={asset.id} value={asset.id}>
+                          {asset.name}
+                        </option>
+                      ))}
+                    </select>
+                  </div>
+                )}
+
                 <label className="block text-sm font-medium text-gray-100 mb-2">
                   Upload Image
                 </label>

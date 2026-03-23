@@ -1,11 +1,12 @@
+/* eslint-disable react-refresh/only-export-components */
 import { createContext, useContext, useEffect, useState } from 'react'
 import { ID, Query } from 'appwrite'
 import { account, databases } from '../lib/appwrite'
 import { useAuth } from './AuthContext'
+import { APPWRITE_DATABASE_ID, APPWRITE_PROJECTS_COLLECTION_ID } from '../lib/config'
 
-const DATABASE_ID = '69ba0d06002eebdcbb81'
-const COLLECTION_ID = 'projects'
 export const FREE_PLAN_LIMIT = 3
+export const PRO_PLAN_LIMIT = 100
 
 const ProjectsContext = createContext(null)
 
@@ -24,8 +25,8 @@ export const ProjectsProvider = ({ children }) => {
     setLoading(true)
     try {
       const result = await databases.listDocuments({
-        databaseId: DATABASE_ID,
-        collectionId: COLLECTION_ID,
+        databaseId: APPWRITE_DATABASE_ID,
+        collectionId: APPWRITE_PROJECTS_COLLECTION_ID,
         queries: [Query.equal('userID', user.$id), Query.orderDesc('$createdAt')]
       })
       setProjects(result.documents)
@@ -43,8 +44,8 @@ export const ProjectsProvider = ({ children }) => {
     }
 
     const result = await databases.createDocument({
-      databaseId: DATABASE_ID,
-      collectionId: COLLECTION_ID,
+      databaseId: APPWRITE_DATABASE_ID,
+      collectionId: APPWRITE_PROJECTS_COLLECTION_ID,
       documentId: ID.unique(),
       data: {
         title: projectData.title.trim(),
@@ -70,13 +71,32 @@ export const ProjectsProvider = ({ children }) => {
 
   const getUserRendersLeft = async () => {
     const prefs = await account.getPrefs()
-    return FREE_PLAN_LIMIT - Number(prefs?.rendersUsed || 0)
+    const limit = Number(prefs?.renderLimit || FREE_PLAN_LIMIT)
+    return limit - Number(prefs?.rendersUsed || 0)
+  }
+
+  const getPlanInfo = async () => {
+    const prefs = await account.getPrefs()
+    return {
+      plan: prefs?.plan || 'free',
+      renderLimit: Number(prefs?.renderLimit || FREE_PLAN_LIMIT),
+      rendersUsed: Number(prefs?.rendersUsed || 0)
+    }
+  }
+
+  const upgradePlan = async () => {
+    const prefs = await account.getPrefs()
+    await account.updatePrefs({
+      ...prefs,
+      plan: 'pro',
+      renderLimit: PRO_PLAN_LIMIT
+    })
   }
 
   const deleteProject = async (projectId) => {
     await databases.deleteDocument({
-      databaseId: DATABASE_ID,
-      collectionId: COLLECTION_ID,
+      databaseId: APPWRITE_DATABASE_ID,
+      collectionId: APPWRITE_PROJECTS_COLLECTION_ID,
       documentId: projectId
     })
     await fetchProjects()
@@ -95,6 +115,8 @@ export const ProjectsProvider = ({ children }) => {
         deleteProject,
         incrementUserRenders,
         getUserRendersLeft,
+        getPlanInfo,
+        upgradePlan,
         fetchProjects
       }}
     >
@@ -104,4 +126,3 @@ export const ProjectsProvider = ({ children }) => {
 }
 
 export const useProjects = () => useContext(ProjectsContext)
-

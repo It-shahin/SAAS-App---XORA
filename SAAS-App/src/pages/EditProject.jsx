@@ -2,9 +2,8 @@ import { useState, useEffect } from 'react'
 import { useParams, useNavigate, Link } from 'react-router-dom'
 import { databases } from '../lib/appwrite'
 import { useAuth } from '../context/AuthContext'
-
-const DATABASE_ID = '69ba0d06002eebdcbb81'
-const COLLECTION_ID = 'projects'
+import { APPWRITE_DATABASE_ID, APPWRITE_PROJECTS_COLLECTION_ID } from '../lib/config'
+import { getScenes, saveScenes } from '../lib/collaboration'
 
 const EditProject = () => {
   const { id } = useParams()
@@ -18,6 +17,7 @@ const EditProject = () => {
   const [loading, setLoading] = useState(true)
   const [saving, setSaving] = useState(false)
   const [error, setError] = useState('')
+  const [scenes, setScenes] = useState([])
 
   const styles = [
     { value: 'clean', label: 'Clean & Modern' },
@@ -31,8 +31,8 @@ const EditProject = () => {
     const fetchProject = async () => {
       try {
         const result = await databases.getDocument({
-          databaseId: DATABASE_ID,
-          collectionId: COLLECTION_ID,
+          databaseId: APPWRITE_DATABASE_ID,
+          collectionId: APPWRITE_PROJECTS_COLLECTION_ID,
           documentId: id
         })
 
@@ -46,7 +46,19 @@ const EditProject = () => {
           description: result.description,
           style: result.style || 'clean'
         })
-      } catch (err) {
+
+        const savedScenes = await getScenes(id)
+        if (savedScenes.length > 0) {
+          setScenes(savedScenes)
+        } else {
+          const derived = result.description
+            .split(/[.!?]+/)
+            .map((text) => text.trim())
+            .filter(Boolean)
+            .map((text, index) => ({ id: `${index + 1}`, text, duration: 4 }))
+          setScenes(derived)
+        }
+      } catch {
         setError('Project not found.')
       } finally {
         setLoading(false)
@@ -61,17 +73,21 @@ const EditProject = () => {
     setSaving(true)
     try {
       await databases.updateDocument({
-        databaseId: DATABASE_ID,
-        collectionId: COLLECTION_ID,
+        databaseId: APPWRITE_DATABASE_ID,
+        collectionId: APPWRITE_PROJECTS_COLLECTION_ID,
         documentId: id,
         data: {
           title: formData.title.trim(),
-          description: formData.description.trim(),
+          description: (scenes.length > 0
+            ? scenes.map((scene) => scene.text.trim()).filter(Boolean).join('. ')
+            : formData.description
+          ).trim(),
           style: formData.style
         }
       })
+      await saveScenes(id, scenes)
       navigate(`/projects/${id}`)
-    } catch (err) {
+    } catch {
       setError('Failed to save changes. Please try again.')
     } finally {
       setSaving(false)
@@ -144,6 +160,57 @@ const EditProject = () => {
               className="block w-full rounded-md bg-white/5 px-3 py-1.5 text-base text-white outline outline-1 -outline-offset-1 outline-white/10 placeholder:text-gray-500 focus:outline focus:outline-2 focus:-outline-offset-2 focus:outline-indigo-500 sm:text-sm resize-vertical"
               placeholder="Write your video script here..."
             />
+          </div>
+
+          <div>
+            <div className="flex items-center justify-between mb-3">
+              <label className="block text-sm font-medium text-gray-100">Scene Editor</label>
+              <button
+                type="button"
+                onClick={() => setScenes([...scenes, { id: crypto.randomUUID(), text: '', duration: 4 }])}
+                className="text-indigo-400 text-xs font-semibold"
+              >
+                + Add scene
+              </button>
+            </div>
+            <div className="space-y-3">
+              {scenes.map((scene, idx) => (
+                <div key={scene.id || idx} className="border border-white/10 rounded-xl p-3 bg-white/5">
+                  <p className="text-xs text-gray-400 mb-2">Scene {idx + 1}</p>
+                  <textarea
+                    rows={2}
+                    value={scene.text}
+                    onChange={(e) => {
+                      const next = [...scenes]
+                      next[idx] = { ...scene, text: e.target.value }
+                      setScenes(next)
+                    }}
+                    className="block w-full rounded-md bg-white/5 px-3 py-2 text-sm text-white outline outline-1 outline-white/10"
+                  />
+                  <div className="flex items-center justify-between mt-2">
+                    <input
+                      type="number"
+                      min={2}
+                      max={12}
+                      value={scene.duration}
+                      onChange={(e) => {
+                        const next = [...scenes]
+                        next[idx] = { ...scene, duration: Number(e.target.value || 4) }
+                        setScenes(next)
+                      }}
+                      className="w-24 rounded-md bg-white/5 px-2 py-1 text-xs text-white outline outline-1 outline-white/10"
+                    />
+                    <button
+                      type="button"
+                      onClick={() => setScenes(scenes.filter((_, i) => i !== idx))}
+                      className="text-red-400 text-xs"
+                    >
+                      Remove
+                    </button>
+                  </div>
+                </div>
+              ))}
+            </div>
           </div>
 
           <div>
