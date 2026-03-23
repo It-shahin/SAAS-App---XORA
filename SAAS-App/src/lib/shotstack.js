@@ -18,10 +18,10 @@ const request = async (path, options = {}) => {
   return data
 }
 
-export const submitRender = async (title, description, style) => {
+export const submitRender = async (title, description, style, options = {}) => {
   const data = await request('/api/render/text', {
     method: 'POST',
-    body: JSON.stringify({ title, description, style })
+    body: JSON.stringify({ title, description, style, options })
   })
   return data.renderId
 }

@@ -65,7 +65,7 @@ const escapeHtml = (value = '') =>
     .replaceAll('"', '&quot;')
     .replaceAll("'", '&#039;')
 
-const buildTimeline = (title, description, style) => {
+const buildTimeline = (title, description, style, options = {}) => {
   const colors = {
     clean: { bg: '#0f0f0f', text: '#ffffff', accent: '#6366f1' },
     bold: { bg: '#1a0533', text: '#ffffff', accent: '#a855f7' },
@@ -80,25 +80,87 @@ const buildTimeline = (title, description, style) => {
   const sceneLength = 4.2
   const sceneStep = sceneLength + sceneGap
   const firstSceneStart = titleLength + sceneGap
+  const titleAlign = options.titleAlign || 'center'
+  const descriptionAlign = options.descriptionAlign || 'center'
+  const vertical = options.textVertical || 'top'
+  const bgMode = options.backgroundMode || 'none'
+  const bgColor = options.backgroundColor || palette.bg
+  const bgAssetType = options.backgroundAssetType || 'image'
+  const bgAssetUrl = options.backgroundAssetUrl || ''
+  const musicUrl = options.musicUrl || ''
+
+  const verticalOffsetMap = {
+    top: -0.32,
+    center: 0,
+    bottom: 0.3
+  }
+  const titleY = verticalOffsetMap[vertical] ?? -0.32
+  const descriptionY = Math.min(titleY + 0.3, 0.55)
+
+  const preTracks = []
+
+  if (bgMode === 'asset' && bgAssetType === 'video' && bgAssetUrl) {
+    preTracks.push({
+      clips: [
+        {
+          asset: { type: 'video', src: bgAssetUrl, volume: 0 },
+          start: 0,
+          length: 'auto',
+          transition: { in: 'fade', out: 'fade' }
+        }
+      ]
+    })
+  }
+
+  if (bgMode === 'asset' && bgAssetType !== 'video' && bgAssetUrl) {
+    preTracks.push({
+      clips: [
+        {
+          asset: { type: 'image', src: bgAssetUrl },
+          start: 0,
+          length: 'end',
+          transition: { in: 'fade', out: 'fade' }
+        }
+      ]
+    })
+  }
+
+  if (musicUrl) {
+    preTracks.push({
+      clips: [
+        {
+          asset: { type: 'audio', src: musicUrl, effect: 'fadeOut', volume: 1 },
+          start: 0,
+          length: 'end'
+        }
+      ]
+    })
+  }
 
   return {
     timeline: {
-      background: palette.bg,
+      background: bgMode === 'color' ? bgColor : palette.bg,
       tracks: [
+        ...preTracks,
         {
           clips: [
             {
               asset: {
-                type: 'html',
-                html: `<p>${escapeHtml(title)}</p>`,
-                css: `p { font-family: 'Open Sans'; font-size: 64px; font-weight: 800; color: ${palette.accent}; text-align: center; margin: 0; padding-top: 24px; }`,
-                width: 1100,
-                height: 220
+                type: 'text',
+                text: String(title || ''),
+                font: {
+                  family: 'Clear Sans',
+                  color: palette.accent,
+                  size: 58
+                },
+                alignment: { horizontal: titleAlign },
+                width: 900,
+                height: 90
               },
               start: 0,
               length: titleLength,
               position: 'center',
-              offset: { x: 0, y: -0.32 },
+              offset: { x: 0, y: titleY },
               transition: { in: 'fade', out: 'fade' }
             }
           ]
@@ -106,16 +168,21 @@ const buildTimeline = (title, description, style) => {
         {
           clips: sentences.map((sentence, i) => ({
             asset: {
-              type: 'html',
-              html: `<p>${escapeHtml(String(sentence || '').trim())}</p>`,
-              css: `p { font-family: 'Open Sans'; font-size: 40px; color: ${palette.text}; text-align: center; line-height: 1.4; margin: 0; padding-bottom: 40px; padding-top: 24px; }`,
+              type: 'text',
+              text: String(sentence || '').trim(),
+              font: {
+                family: 'Clear Sans',
+                color: palette.text,
+                size: 40
+              },
+              alignment: { horizontal: descriptionAlign },
               width: 1000,
-              height: 300
+              height: 220
             },
             start: firstSceneStart + i * sceneStep,
             length: sceneLength,
             position: 'center',
-            offset: { x: 0, y: 0.22 },
+            offset: { x: 0, y: descriptionY },
             transition: { in: 'fade', out: 'fade' }
           }))
         }
@@ -158,7 +225,7 @@ const server = http.createServer(async (req, res) => {
   try {
     if (req.method === 'POST' && url.pathname === '/api/render/text') {
       const body = await readBody(req)
-      const renderId = await postShotstack(buildTimeline(body.title, body.description, body.style))
+      const renderId = await postShotstack(buildTimeline(body.title, body.description, body.style, body.options || {}))
       return sendJson(res, 200, { renderId })
     }
 

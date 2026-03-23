@@ -6,11 +6,14 @@ import { useAuth } from '../context/AuthContext'
 import { useProjects } from '../context/ProjectsContext'
 import {
   addComment,
+  addAsset,
   getCollaborators,
   getComments,
+  listAssets,
   getScenes,
   saveCollaborators
 } from '../lib/collaboration'
+import { uploadImage } from '../lib/upload'
 import {
   APPWRITE_DATABASE_ID,
   APPWRITE_PROJECTS_COLLECTION_ID,
@@ -40,6 +43,17 @@ const ProjectDetail = () => {
   const [disableDownload, setDisableDownload] = useState(false)
   const [inviteEmail, setInviteEmail] = useState('')
   const [commentText, setCommentText] = useState('')
+  const [titleAlign, setTitleAlign] = useState('center')
+  const [descriptionAlign, setDescriptionAlign] = useState('center')
+  const [textVertical, setTextVertical] = useState('top')
+  const [backgroundMode, setBackgroundMode] = useState('none')
+  const [backgroundColor, setBackgroundColor] = useState('#0f0f0f')
+  const [backgroundAssetType, setBackgroundAssetType] = useState('image')
+  const [backgroundAssetUrl, setBackgroundAssetUrl] = useState('')
+  const [musicUrl, setMusicUrl] = useState('')
+  const [assets, setAssets] = useState([])
+  const [assetLoading, setAssetLoading] = useState(false)
+  const [assetPickerOpen, setAssetPickerOpen] = useState(false)
 
   const [scenes, setScenes] = useState([])
   const [collaborators, setCollaborators] = useState([])
@@ -62,6 +76,7 @@ const ProjectDetail = () => {
       setScenes(await getScenes(id))
       setCollaborators(await getCollaborators(id))
       setComments(await getComments(id))
+      setAssets(await listAssets())
       setError('')
     } catch {
       setError('Project not found.')
@@ -156,7 +171,16 @@ const ProjectDetail = () => {
       if (project.mode === 'image') {
         renderId = await submitImageRender(project.sourceImageUrl, timelineText || 'Cinematic slow camera movement')
       } else {
-        renderId = await submitRender(project.title, timelineText || project.description, project.style || 'clean')
+        renderId = await submitRender(project.title, timelineText || project.description, project.style || 'clean', {
+          titleAlign,
+          descriptionAlign,
+          textVertical,
+          backgroundMode,
+          backgroundColor,
+          backgroundAssetType,
+          backgroundAssetUrl,
+          musicUrl
+        })
       }
 
       setQueueStage('Rendering')
@@ -267,6 +291,26 @@ const ProjectDetail = () => {
     setComments(await getComments(id))
   }
 
+  const handleBackgroundUpload = async (e) => {
+    const file = e.target.files?.[0]
+    if (!file) return
+    setAssetLoading(true)
+    try {
+      const url = await uploadImage(file)
+      await addAsset(file.name, url)
+      const nextAssets = await listAssets()
+      setAssets(nextAssets)
+      setBackgroundMode('asset')
+      setBackgroundAssetType(file.type.startsWith('video/') ? 'video' : 'image')
+      setBackgroundAssetUrl(url)
+    } catch {
+      setGenError('Failed to upload background asset.')
+    } finally {
+      setAssetLoading(false)
+      e.target.value = ''
+    }
+  }
+
   if (loading) return <div className="min-h-screen bg-s1 flex items-center justify-center"><p className="text-p3">Loading project...</p></div>
   if (error || !project) return <div className="min-h-screen bg-s1 flex flex-col items-center justify-center gap-4"><p className="text-red-400">{error || 'Project not found.'}</p><Link to="/dashboard" className="text-p1 hover:underline">Back to dashboard</Link></div>
 
@@ -315,6 +359,101 @@ const ProjectDetail = () => {
           <p className="text-p3 text-xs uppercase tracking-widest mb-3">Generated Video</p>
           {project.videoUrl ? <video controls className="w-full rounded-xl" src={project.videoUrl} /> : <p className="text-gray-400 text-sm">No video yet.</p>}
           {shareError && <p className="text-red-400 text-sm mt-3">{shareError}</p>}
+
+          {project.mode === 'text' && (
+            <div className="mt-4 rounded-xl border border-white/10 bg-white/5 p-4 space-y-4">
+              <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
+                <select value={titleAlign} onChange={(e) => setTitleAlign(e.target.value)} className="rounded-md bg-white/5 px-3 py-2 text-sm text-white outline outline-1 outline-white/10">
+                  <option value="left">Title Align: Left</option>
+                  <option value="center">Title Align: Center</option>
+                  <option value="right">Title Align: Right</option>
+                </select>
+                <select value={descriptionAlign} onChange={(e) => setDescriptionAlign(e.target.value)} className="rounded-md bg-white/5 px-3 py-2 text-sm text-white outline outline-1 outline-white/10">
+                  <option value="left">Description Align: Left</option>
+                  <option value="center">Description Align: Center</option>
+                  <option value="right">Description Align: Right</option>
+                </select>
+                <select value={textVertical} onChange={(e) => setTextVertical(e.target.value)} className="rounded-md bg-white/5 px-3 py-2 text-sm text-white outline outline-1 outline-white/10">
+                  <option value="top">Text Position: Top</option>
+                  <option value="center">Text Position: Center</option>
+                  <option value="bottom">Text Position: Bottom</option>
+                </select>
+              </div>
+
+              <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
+                <select value={backgroundMode} onChange={(e) => setBackgroundMode(e.target.value)} className="rounded-md bg-white/5 px-3 py-2 text-sm text-white outline outline-1 outline-white/10">
+                  <option value="none">Background: None</option>
+                  <option value="color">Background: Color</option>
+                  <option value="asset">Background: Asset</option>
+                </select>
+
+                {backgroundMode === 'asset' && (
+                  <>
+                    <button
+                      type="button"
+                      onClick={() => setAssetPickerOpen(true)}
+                      className="rounded-md bg-indigo-500 hover:bg-indigo-600 px-3 py-2 text-sm font-semibold text-white"
+                    >
+                      {backgroundAssetUrl ? 'Change Asset' : 'Choose Asset'}
+                    </button>
+                    <label className="inline-flex items-center justify-center rounded-md bg-white/10 hover:bg-white/20 px-3 py-2 text-sm font-semibold text-white cursor-pointer">
+                      {assetLoading ? 'Uploading...' : 'Upload New'}
+                      <input type="file" accept="image/*,video/*" className="hidden" onChange={handleBackgroundUpload} />
+                    </label>
+                  </>
+                )}
+              </div>
+
+              {backgroundMode === 'color' && (
+                <div className="flex flex-wrap gap-2">
+                  {['#0f0f0f', '#1a0533', '#0a1628', '#111827', '#1f2937', '#f5f5f5'].map((color) => (
+                    <button
+                      key={color}
+                      type="button"
+                      onClick={() => setBackgroundColor(color)}
+                      className={`h-8 w-8 rounded-full border-2 ${backgroundColor === color ? 'border-white' : 'border-transparent'}`}
+                      style={{ backgroundColor: color }}
+                    />
+                  ))}
+                </div>
+              )}
+
+              <input value={musicUrl} onChange={(e) => setMusicUrl(e.target.value)} placeholder="Optional music URL (.mp3)" className="w-full rounded-md bg-white/5 px-3 py-2 text-sm text-white outline outline-1 outline-white/10" />
+
+              {assetPickerOpen && (
+                <div className="fixed inset-0 z-40 bg-black/70 flex items-center justify-center p-4">
+                  <div className="w-full max-w-3xl rounded-2xl border border-white/10 bg-gray-900 p-4">
+                    <div className="flex items-center justify-between mb-4">
+                      <h3 className="text-lg font-bold">Choose Background Asset</h3>
+                      <button type="button" onClick={() => setAssetPickerOpen(false)} className="text-gray-400 hover:text-white">Close</button>
+                    </div>
+                    <div className="grid grid-cols-2 md:grid-cols-3 gap-3 max-h-[60vh] overflow-auto">
+                      {assets.map((asset) => (
+                        <button
+                          key={asset.$id}
+                          type="button"
+                          onClick={() => {
+                            setBackgroundMode('asset')
+                            setBackgroundAssetType(asset.url.match(/\.(mp4|mov|webm)(\?|$)/i) ? 'video' : 'image')
+                            setBackgroundAssetUrl(asset.url)
+                            setAssetPickerOpen(false)
+                          }}
+                          className="rounded-xl border border-white/10 bg-white/5 p-2 text-left hover:border-indigo-400"
+                        >
+                          {asset.url.match(/\.(mp4|mov|webm)(\?|$)/i) ? (
+                            <video src={asset.url} className="w-full h-24 object-cover rounded-md mb-2" />
+                          ) : (
+                            <img src={asset.url} alt={asset.name} className="w-full h-24 object-cover rounded-md mb-2" />
+                          )}
+                          <p className="text-xs truncate">{asset.name}</p>
+                        </button>
+                      ))}
+                    </div>
+                  </div>
+                </div>
+              )}
+            </div>
+          )}
 
           <div className="grid grid-cols-1 md:grid-cols-3 gap-3 mt-4">
             <input type="number" min={1} value={shareExpiryHours} onChange={(e) => setShareExpiryHours(Number(e.target.value || 72))} className="rounded-md bg-white/5 px-3 py-2 text-sm text-white outline outline-1 outline-white/10" />
@@ -378,4 +517,3 @@ const ProjectDetail = () => {
 }
 
 export default ProjectDetail
-
