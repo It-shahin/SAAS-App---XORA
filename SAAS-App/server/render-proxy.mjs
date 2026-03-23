@@ -107,7 +107,7 @@ const buildTimeline = (title, description, style) => {
             asset: {
               type: 'html',
               html: `<p>${escapeHtml(String(sentence || '').trim())}</p>`,
-              css: `p { font-family: 'Open Sans'; font-size: 40px; color: ${palette.text}; text-align: center; line-height: 1.4; margin: 0; padding-bottom: 40px; }`,
+              css: `p { font-family: 'Open Sans'; font-size: 40px; color: ${palette.text}; text-align: center; line-height: 1.4; margin: 0; padding-bottom: 40px; padding-top: 24px; }`,
               width: 1000,
               height: 300
             },
