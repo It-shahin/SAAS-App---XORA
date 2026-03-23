@@ -96,6 +96,13 @@ const buildTimeline = (title, description, style, options = {}) => {
   }
   const titleY = verticalOffsetMap[vertical] ?? -0.32
   const descriptionY = Math.min(titleY + 0.3, 0.55)
+  const alignOffsetMap = {
+    left: -0.28,
+    center: 0,
+    right: 0.28
+  }
+  const titleX = alignOffsetMap[titleAlign] ?? 0
+  const descriptionX = alignOffsetMap[descriptionAlign] ?? 0
 
   const preTracks = []
 
@@ -160,7 +167,7 @@ const buildTimeline = (title, description, style, options = {}) => {
               start: 0,
               length: titleLength,
               position: 'center',
-              offset: { x: 0, y: titleY },
+              offset: { x: titleX, y: titleY },
               transition: { in: 'fade', out: 'fade' }
             }
           ]
@@ -182,7 +189,7 @@ const buildTimeline = (title, description, style, options = {}) => {
             start: firstSceneStart + i * sceneStep,
             length: sceneLength,
             position: 'center',
-            offset: { x: 0, y: descriptionY },
+            offset: { x: descriptionX, y: descriptionY },
             transition: { in: 'fade', out: 'fade' }
           }))
         }

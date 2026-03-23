@@ -50,6 +50,7 @@ const ProjectDetail = () => {
   const [backgroundColor, setBackgroundColor] = useState('#0f0f0f')
   const [backgroundAssetType, setBackgroundAssetType] = useState('image')
   const [backgroundAssetUrl, setBackgroundAssetUrl] = useState('')
+  const [renderStyle, setRenderStyle] = useState('clean')
   const [musicUrl, setMusicUrl] = useState('')
   const [assets, setAssets] = useState([])
   const [assetLoading, setAssetLoading] = useState(false)
@@ -73,6 +74,7 @@ const ProjectDetail = () => {
         return
       }
       setProject(result)
+      setRenderStyle(result.style || 'clean')
       setScenes(await getScenes(id))
       setCollaborators(await getCollaborators(id))
       setComments(await getComments(id))
@@ -171,7 +173,7 @@ const ProjectDetail = () => {
       if (project.mode === 'image') {
         renderId = await submitImageRender(project.sourceImageUrl, timelineText || 'Cinematic slow camera movement')
       } else {
-        renderId = await submitRender(project.title, timelineText || project.description, project.style || 'clean', {
+        renderId = await submitRender(project.title, timelineText || project.description, renderStyle || 'clean', {
           titleAlign,
           descriptionAlign,
           textVertical,
@@ -184,6 +186,12 @@ const ProjectDetail = () => {
       }
 
       setQueueStage('Rendering')
+      await databases.updateDocument({
+        databaseId: APPWRITE_DATABASE_ID,
+        collectionId: APPWRITE_PROJECTS_COLLECTION_ID,
+        documentId: id,
+        data: { style: renderStyle }
+      })
       await databases.updateDocument({
         databaseId: APPWRITE_DATABASE_ID,
         collectionId: APPWRITE_PROJECTS_COLLECTION_ID,
@@ -363,6 +371,12 @@ const ProjectDetail = () => {
           {project.mode === 'text' && (
             <div className="mt-4 rounded-xl border border-white/10 bg-white/5 p-4 space-y-4">
               <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
+                <select value={renderStyle} onChange={(e) => setRenderStyle(e.target.value)} className="rounded-md bg-white/5 px-3 py-2 text-sm text-white outline outline-1 outline-white/10">
+                  <option value="clean">Style: Clean</option>
+                  <option value="bold">Style: Bold</option>
+                  <option value="minimal">Style: Minimal</option>
+                  <option value="corporate">Style: Corporate</option>
+                </select>
                 <select value={titleAlign} onChange={(e) => setTitleAlign(e.target.value)} className="rounded-md bg-white/5 px-3 py-2 text-sm text-white outline outline-1 outline-white/10">
                   <option value="left">Title Align: Left</option>
                   <option value="center">Title Align: Center</option>
@@ -434,7 +448,7 @@ const ProjectDetail = () => {
                           type="button"
                           onClick={() => {
                             setBackgroundMode('asset')
-                            setBackgroundAssetType(asset.url.match(/\.(mp4|mov|webm)(\?|$)/i) ? 'video' : 'image')
+                            setBackgroundAssetType((asset.name || '').match(/\.(mp4|mov|webm)$/i) ? 'video' : 'image')
                             setBackgroundAssetUrl(asset.url)
                             setAssetPickerOpen(false)
                           }}
