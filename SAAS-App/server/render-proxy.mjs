@@ -75,6 +75,12 @@ const buildTimeline = (title, description, style) => {
   const palette = colors[style] || colors.clean
   const sentences = (String(description || '').match(/[^.!?]+[.!?]+/g) || [description]).slice(0, 4)
 
+  const titleLength = 4
+  const sceneGap = 0.6
+  const sceneLength = 4.2
+  const sceneStep = sceneLength + sceneGap
+  const firstSceneStart = titleLength + sceneGap
+
   return {
     timeline: {
       background: palette.bg,
@@ -90,7 +96,7 @@ const buildTimeline = (title, description, style) => {
                 height: 200
               },
               start: 0,
-              length: 4,
+              length: titleLength,
               position: 'center',
               transition: { in: 'fade', out: 'fade' }
             }
@@ -105,8 +111,8 @@ const buildTimeline = (title, description, style) => {
               width: 1000,
               height: 300
             },
-            start: i * 4.8,
-            length: 4.2,
+            start: firstSceneStart + i * sceneStep,
+            length: sceneLength,
             position: 'center',
             transition: { in: 'fade', out: 'fade' }
           }))
