@@ -67,11 +67,12 @@ const escapeHtml = (value = '') =>
 
 const buildTimeline = (title, description, style, options = {}) => {
   const colors = {
-    clean: { bg: '#0f0f0f', text: '#ffffff', accent: '#6366f1' },
-    bold: { bg: '#1a0533', text: '#ffffff', accent: '#a855f7' },
-    minimal: { bg: '#f5f5f5', text: '#111111', accent: '#6366f1' },
-    corporate: { bg: '#0a1628', text: '#ffffff', accent: '#3b82f6' }
+    clean:     { bg: '#0f0f0f', text: '#ffffff', accent: '#6366f1' },
+    bold:      { bg: '#1a0533', text: '#ffffff', accent: '#a855f7' },
+    minimal:   { bg: '#f5f5f5', text: '#111111', accent: '#6366f1' },
+    corporate: { bg: '#0a1628', text: '#ffffff', accent: '#3b82f6' },
   }
+
   const palette = colors[style] || colors.clean
   const sentences = (String(description || '').match(/[^.!?]+[.!?]+/g) || [description]).slice(0, 4)
 
@@ -80,67 +81,59 @@ const buildTimeline = (title, description, style, options = {}) => {
   const sceneLength = 4.2
   const sceneStep = sceneLength + sceneGap
   const firstSceneStart = titleLength + sceneGap
-  const titleAlign = options.titleAlign || 'center'
-  const descriptionAlign = options.descriptionAlign || 'center'
-  const vertical = options.textVertical || 'top'
-  const bgMode = options.backgroundMode || 'none'
-  const bgColor = options.backgroundColor || palette.bg
-  const bgAssetType = options.backgroundAssetType || 'image'
-  const bgAssetUrl = options.backgroundAssetUrl || ''
-  const musicUrl = options.musicUrl || ''
 
-  const verticalOffsetMap = {
-    top: -0.32,
-    center: 0,
-    bottom: 0.3
-  }
+  const titleAlign       = options.titleAlign        || 'center'
+  const descriptionAlign = options.descriptionAlign  || 'center'
+  const vertical         = options.textVertical      || 'top'
+  const bgMode           = options.backgroundMode    || 'none'
+  const bgColor          = options.backgroundColor   || palette.bg
+  const bgAssetType      = options.backgroundAssetType || 'image'
+  const bgAssetUrl       = options.backgroundAssetUrl  || ''
+  const musicUrl         = options.musicUrl           || ''
+
+  // ← NEW: user can override font colors, fallback to palette
+  const titleColor = options.titleColor || palette.accent
+  const textColor  = options.textColor  || palette.text
+
+  const verticalOffsetMap = { top: -0.32, center: 0, bottom: 0.3 }
   const titleY = verticalOffsetMap[vertical] ?? -0.32
   const descriptionY = Math.min(titleY + 0.3, 0.55)
-  const alignOffsetMap = {
-    left: -0.28,
-    center: 0,
-    right: 0.28
-  }
-  const titleX = alignOffsetMap[titleAlign] ?? 0
+
+  const alignOffsetMap = { left: -0.28, center: 0, right: 0.28 }
+  const titleX       = alignOffsetMap[titleAlign]       ?? 0
   const descriptionX = alignOffsetMap[descriptionAlign] ?? 0
 
   const preTracks = []
 
   if (bgMode === 'asset' && bgAssetType === 'video' && bgAssetUrl) {
     preTracks.push({
-      clips: [
-        {
-          asset: { type: 'video', src: bgAssetUrl, volume: 0 },
-          start: 0,
-          length: 'auto',
-          transition: { in: 'fade', out: 'fade' }
-        }
-      ]
+      clips: [{
+        asset: { type: 'video', src: bgAssetUrl, volume: 0 },
+        start: 0,
+        length: 'auto',
+        transition: { in: 'fade', out: 'fade' }
+      }]
     })
   }
 
   if (bgMode === 'asset' && bgAssetType !== 'video' && bgAssetUrl) {
     preTracks.push({
-      clips: [
-        {
-          asset: { type: 'image', src: bgAssetUrl },
-          start: 0,
-          length: 'end',
-          transition: { in: 'fade', out: 'fade' }
-        }
-      ]
+      clips: [{
+        asset: { type: 'image', src: bgAssetUrl },
+        start: 0,
+        length: 'end',
+        transition: { in: 'fade', out: 'fade' }
+      }]
     })
   }
 
   if (musicUrl) {
     preTracks.push({
-      clips: [
-        {
-          asset: { type: 'audio', src: musicUrl, effect: 'fadeOut', volume: 1 },
-          start: 0,
-          length: 'end'
-        }
-      ]
+      clips: [{
+        asset: { type: 'audio', src: musicUrl, effect: 'fadeOut', volume: 1 },
+        start: 0,
+        length: 'end'
+      }]
     })
   }
 
@@ -150,27 +143,25 @@ const buildTimeline = (title, description, style, options = {}) => {
       tracks: [
         ...preTracks,
         {
-          clips: [
-            {
-              asset: {
-                type: 'text',
-                text: String(title || ''),
-                font: {
-                  family: 'Clear Sans',
-                  color: palette.accent,
-                  size: 58
-                },
-                alignment: { horizontal: titleAlign },
-                width: 900,
-                height: 90
+          clips: [{
+            asset: {
+              type: 'text',
+              text: String(title || ''),
+              font: {
+                family: 'Clear Sans',
+                color: titleColor,  // ← was palette.accent
+                size: 58
               },
-              start: 0,
-              length: titleLength,
-              position: 'center',
-              offset: { x: titleX, y: titleY },
-              transition: { in: 'fade', out: 'fade' }
-            }
-          ]
+              alignment: { horizontal: titleAlign },
+              width: 900,
+              height: 90
+            },
+            start: 0,
+            length: titleLength,
+            position: 'center',
+            offset: { x: titleX, y: titleY },
+            transition: { in: 'fade', out: 'fade' }
+          }]
         },
         {
           clips: sentences.map((sentence, i) => ({
@@ -179,7 +170,7 @@ const buildTimeline = (title, description, style, options = {}) => {
               text: String(sentence || '').trim(),
               font: {
                 family: 'Clear Sans',
-                color: palette.text,
+                color: textColor,  // ← was palette.text
                 size: 40
               },
               alignment: { horizontal: descriptionAlign },
@@ -198,6 +189,7 @@ const buildTimeline = (title, description, style, options = {}) => {
     output: { format: 'mp4', resolution: 'hd' }
   }
 }
+
 
 const postShotstack = async (payload) => {
   try {

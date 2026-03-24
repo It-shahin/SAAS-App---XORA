@@ -10,6 +10,13 @@ import { APPWRITE_DATABASE_ID, APPWRITE_PROJECTS_COLLECTION_ID, APPWRITE_SHARES_
 
 const QUEUE_STAGES = ['Queued', 'Preparing timeline', 'Rendering', 'Finalizing', 'Completed']
 const STYLES = ['clean', 'bold', 'minimal', 'corporate']
+const PALETTES = {
+  clean:     { accent: '#6366f1', text: '#ffffff' },
+  bold:      { accent: '#a855f7', text: '#ffffff' },
+  minimal:   { accent: '#6366f1', text: '#111111' },
+  corporate: { accent: '#3b82f6', text: '#ffffff' },
+}
+
 
 const ProjectDetail = () => {
   const { id } = useParams()
@@ -36,7 +43,17 @@ const ProjectDetail = () => {
   const [commentText, setCommentText] = useState('')
 
   // ← Style state — syncs with project.style on load
-  const [selectedStyle, setSelectedStyle] = useState('clean')
+  // ✅ CORRECT — these must be two separate statements
+const [selectedStyle, setSelectedStyle] = useState('clean')
+
+useEffect(() => {
+  if (project?.style) {
+    setSelectedStyle(project.style)
+    setTitleColor(PALETTES[project.style]?.accent || '#6366f1')
+    setTextColor(PALETTES[project.style]?.text || '#ffffff')
+  }
+}, [project?.style])
+
   const [titleAlign, setTitleAlign] = useState('center')
   const [descriptionAlign, setDescriptionAlign] = useState('center')
   const [textVertical, setTextVertical] = useState('top')
@@ -53,6 +70,9 @@ const ProjectDetail = () => {
   const [collaborators, setCollaborators] = useState([])
   const [comments, setComments] = useState([])
   const [queueStage, setQueueStage] = useState('Queued')
+
+  const [titleColor, setTitleColor] = useState('#6366f1')
+  const [textColor, setTextColor] = useState('#ffffff')
 
   const fetchProject = async () => {
     if (!user) return
@@ -181,7 +201,9 @@ const ProjectDetail = () => {
             backgroundColor,
             backgroundAssetType,
             backgroundAssetUrl,
-            musicUrl
+            musicUrl,
+            titleColor,
+            textColor,
           }
         )
       }
@@ -407,7 +429,11 @@ const ProjectDetail = () => {
                   <button
                     key={s}
                     type="button"
-                    onClick={() => setSelectedStyle(s)}
+                    onClick={() => {
+                      setSelectedStyle(s)
+                      setTitleColor(PALETTES[s].accent)
+                      setTextColor(PALETTES[s].text)
+                    }}
                     className={`px-4 py-2 rounded-xl text-sm font-bold border transition-all capitalize ${
                       selectedStyle === s
                         ? 'bg-indigo-500/20 border-indigo-500 text-white'
@@ -419,6 +445,35 @@ const ProjectDetail = () => {
                 ))}
               </div>
             </div>
+
+            {/* ← NEW: Color overrides */}
+            <div className="flex gap-6">
+              <div className="flex flex-col gap-1">
+                <label className="text-gray-400 text-xs">Title Color</label>
+                <div className="flex items-center gap-2">
+                  <input
+                    type="color"
+                    value={titleColor}
+                    onChange={(e) => setTitleColor(e.target.value)}
+                    className="w-10 h-10 rounded-lg border border-white/10 cursor-pointer bg-transparent"
+                  />
+                  <span className="text-gray-500 text-xs font-mono">{titleColor}</span>
+                </div>
+              </div>
+              <div className="flex flex-col gap-1">
+                <label className="text-gray-400 text-xs">Text Color</label>
+                <div className="flex items-center gap-2">
+                  <input
+                    type="color"
+                    value={textColor}
+                    onChange={(e) => setTextColor(e.target.value)}
+                    className="w-10 h-10 rounded-lg border border-white/10 cursor-pointer bg-transparent"
+                  />
+                  <span className="text-gray-500 text-xs font-mono">{textColor}</span>
+                </div>
+              </div>
+            </div>
+
 
             {/* Text alignment */}
             <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
