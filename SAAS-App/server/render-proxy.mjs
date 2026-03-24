@@ -232,6 +232,8 @@ const server = http.createServer(async (req, res) => {
   try {
     if (req.method === 'POST' && url.pathname === '/api/render/text') {
       const body = await readBody(req)
+      console.log('STYLE:', body.style)         // ← should print 'bold', 'minimal' etc
+      console.log('OPTIONS:', body.options)      // ← should print your options
       const renderId = await postShotstack(buildTimeline(body.title, body.description, body.style, body.options || {}))
       return sendJson(res, 200, { renderId })
     }
