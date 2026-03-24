@@ -4,23 +4,12 @@ import { databases, ID } from '../lib/appwrite'
 import { submitImageRender, submitRender, pollRender } from '../lib/shotstack'
 import { useAuth } from '../context/AuthContext'
 import { useProjects } from '../context/ProjectsContext'
-import {
-  addComment,
-  addAsset,
-  getCollaborators,
-  getComments,
-  listAssets,
-  getScenes,
-  saveCollaborators
-} from '../lib/collaboration'
+import { addComment, addAsset, getCollaborators, getComments, listAssets, getScenes, saveCollaborators } from '../lib/collaboration'
 import { uploadImage } from '../lib/upload'
-import {
-  APPWRITE_DATABASE_ID,
-  APPWRITE_PROJECTS_COLLECTION_ID,
-  APPWRITE_SHARES_COLLECTION_ID
-} from '../lib/config'
+import { APPWRITE_DATABASE_ID, APPWRITE_PROJECTS_COLLECTION_ID, APPWRITE_SHARES_COLLECTION_ID } from '../lib/config'
 
 const QUEUE_STAGES = ['Queued', 'Preparing timeline', 'Rendering', 'Finalizing', 'Completed']
+const STYLES = ['clean', 'bold', 'minimal', 'corporate']
 
 const ProjectDetail = () => {
   const { id } = useParams()
@@ -35,14 +24,19 @@ const ProjectDetail = () => {
   const [showConfirm, setShowConfirm] = useState(false)
   const [generating, setGenerating] = useState(false)
   const [genError, setGenError] = useState('')
+
   const [shareLoading, setShareLoading] = useState(false)
   const [shareCopied, setShareCopied] = useState(false)
   const [shareError, setShareError] = useState('')
   const [shareExpiryHours, setShareExpiryHours] = useState(72)
   const [sharePassword, setSharePassword] = useState('')
   const [disableDownload, setDisableDownload] = useState(false)
+
   const [inviteEmail, setInviteEmail] = useState('')
   const [commentText, setCommentText] = useState('')
+
+  // ← Style state — syncs with project.style on load
+  const [selectedStyle, setSelectedStyle] = useState('clean')
   const [titleAlign, setTitleAlign] = useState('center')
   const [descriptionAlign, setDescriptionAlign] = useState('center')
   const [textVertical, setTextVertical] = useState('top')
@@ -51,10 +45,10 @@ const ProjectDetail = () => {
   const [backgroundAssetType, setBackgroundAssetType] = useState('image')
   const [backgroundAssetUrl, setBackgroundAssetUrl] = useState('')
   const [musicUrl, setMusicUrl] = useState('')
+
   const [assets, setAssets] = useState([])
   const [assetLoading, setAssetLoading] = useState(false)
   const [assetPickerOpen, setAssetPickerOpen] = useState(false)
-
   const [scenes, setScenes] = useState([])
   const [collaborators, setCollaborators] = useState([])
   const [comments, setComments] = useState([])
@@ -85,9 +79,12 @@ const ProjectDetail = () => {
     }
   }
 
+  useEffect(() => { fetchProject() }, [id, user?.$id])
+
+  // ← Sync selectedStyle when project loads
   useEffect(() => {
-    fetchProject()
-  }, [id, user?.$id])
+    if (project?.style) setSelectedStyle(project.style)
+  }, [project?.style])
 
   useEffect(() => {
     if (project?.status === 'completed' || project?.videoUrl) {
@@ -154,41 +151,40 @@ const ProjectDetail = () => {
       setGenError('You reached your current render limit. Upgrade from Billing.')
       return
     }
-
     setGenerating(true)
     setQueueStage('Preparing timeline')
-
     try {
+      // ← Save selectedStyle to DB before rendering
       await databases.updateDocument({
         databaseId: APPWRITE_DATABASE_ID,
         collectionId: APPWRITE_PROJECTS_COLLECTION_ID,
         documentId: id,
-        data: { status: 'processing' }
+        data: { status: 'processing', style: selectedStyle }
       })
-
       const timelineText = derivedScenes.map((scene) => scene.text).join('. ')
       let renderId
       if (project.mode === 'image') {
-        renderId = await submitImageRender(project.sourceImageUrl, timelineText || 'Cinematic slow camera movement')
+        renderId = await submitImageRender(
+          project.sourceImageUrl,
+          timelineText || 'Cinematic slow camera movement'
+        )
       } else {
         renderId = await submitRender(
-        project.title,
-        timelineText || project.description,
-        project.style || 'clean',
-        {
-          titleAlign,
-          descriptionAlign,
-          textVertical,
-          backgroundMode,
-          backgroundColor,
-          backgroundAssetType,
-          backgroundAssetUrl,
-          musicUrl
-        }
-)
-
+          project.title,
+          timelineText || project.description,
+          selectedStyle,  // ← use selectedStyle, not project.style
+          {
+            titleAlign,
+            descriptionAlign,
+            textVertical,
+            backgroundMode,
+            backgroundColor,
+            backgroundAssetType,
+            backgroundAssetUrl,
+            musicUrl
+          }
+        )
       }
-
       setQueueStage('Rendering')
       await databases.updateDocument({
         databaseId: APPWRITE_DATABASE_ID,
@@ -261,7 +257,6 @@ const ProjectDetail = () => {
           data: payload
         })
       }
-
       const params = new URLSearchParams()
       params.set('exp', String(Date.now() + shareExpiryHours * 3600 * 1000))
       if (disableDownload) params.set('nodl', '1')
@@ -317,206 +312,428 @@ const ProjectDetail = () => {
     }
   }
 
-  if (loading) return <div className="min-h-screen bg-s1 flex items-center justify-center"><p className="text-p3">Loading project...</p></div>
-  if (error || !project) return <div className="min-h-screen bg-s1 flex flex-col items-center justify-center gap-4"><p className="text-red-400">{error || 'Project not found.'}</p><Link to="/dashboard" className="text-p1 hover:underline">Back to dashboard</Link></div>
+  if (loading) return (
+    <div className="min-h-screen bg-gray-900 flex items-center justify-center">
+      <div className="size-12 border-4 border-indigo-500/30 border-t-indigo-500 rounded-full animate-spin" />
+    </div>
+  )
+
+  if (error || !project) return (
+    <div className="min-h-screen bg-gray-900 flex flex-col items-center justify-center gap-4 text-center px-6">
+      <p className="text-red-400 text-lg">{error || 'Project not found.'}</p>
+      <Link to="/dashboard" className="text-indigo-400 hover:underline text-sm">← Back to dashboard</Link>
+    </div>
+  )
 
   return (
-    <div className="min-h-screen bg-s1 text-white">
-      <header className="border-b border-s3/20 px-8 py-4 flex items-center justify-between">
-        <Link to="/"><img src="/images/xora.svg" width={100} height={40} alt="Trimix AI" /></Link>
-        <Link to="/dashboard" className="text-p3 text-sm hover:text-p1 transition-colors">Dashboard</Link>
+    <div className="min-h-screen bg-gray-900 text-white flex flex-col">
+
+      {/* Header */}
+      <header className="border-b border-white/10 px-6 py-4 flex items-center justify-between sticky top-0 z-10 backdrop-blur-sm bg-gray-900/80">
+        <Link to="/dashboard">
+          <img src="/images/xora.svg" width={120} height={48} alt="Xora" />
+        </Link>
+        <Link to="/dashboard" className="text-gray-400 text-sm hover:text-white transition-colors">
+          ← Dashboard
+        </Link>
       </header>
 
-      <div className="max-w-5xl mx-auto px-8 py-12 space-y-6">
-        <div className="flex items-start justify-between gap-4">
-          <div><p className="text-p3 text-xs uppercase tracking-widest mb-2">Project</p><h1 className="text-4xl font-bold">{project.title}</h1></div>
-          <span className="mt-2 px-3 py-1 rounded-full text-xs font-bold bg-s3/20 text-p3">{project.status}</span>
+      <div className="flex-1 px-6 py-10 max-w-4xl mx-auto w-full space-y-10">
+
+        {/* Title + status */}
+        <div className="flex items-start justify-between gap-4 flex-wrap">
+          <div>
+            <p className="text-gray-400 text-xs uppercase tracking-widest mb-1">Project</p>
+            <h1 className="text-3xl font-bold">{project.title}</h1>
+          </div>
+          <span className={`px-3 py-1 rounded-full text-xs font-bold border ${
+            project.status === 'completed'
+              ? 'bg-indigo-500/20 text-indigo-400 border-indigo-500/30'
+              : project.status === 'processing'
+              ? 'bg-yellow-500/20 text-yellow-400 border-yellow-500/30'
+              : 'bg-gray-800/50 text-gray-400 border-gray-500/30'
+          }`}>
+            {project.status}
+          </span>
         </div>
 
-        <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-          <div className="bg-s2 border border-s3/20 rounded-2xl p-6">
-            <p className="text-p3 text-xs uppercase tracking-widest mb-3">Render Queue</p>
-            <div className="space-y-2">
-              {QUEUE_STAGES.map((stage, idx) => (
-                <div key={stage} className="flex items-center justify-between border border-white/10 rounded-lg px-3 py-2">
-                  <span className="text-sm">{stage}</span>
-                  <span className={`text-xs ${idx <= queueStageIndex ? 'text-green-400' : 'text-gray-500'}`}>
-                    {idx < queueStageIndex ? 'Done' : idx === queueStageIndex ? 'Active' : 'Pending'}
-                  </span>
+        {/* Render Queue */}
+        <div className="bg-white/5 border border-white/10 rounded-2xl p-6">
+          <p className="text-gray-400 text-xs uppercase tracking-widest mb-4">Render Queue</p>
+          <div className="flex items-center gap-2 flex-wrap">
+            {QUEUE_STAGES.map((stage, i) => (
+              <div key={stage} className="flex items-center gap-2">
+                <div className={`flex items-center gap-2 px-3 py-1.5 rounded-full text-xs font-bold transition-all ${
+                  i < queueStageIndex
+                    ? 'bg-indigo-500/20 text-indigo-400'
+                    : i === queueStageIndex
+                    ? 'bg-indigo-500 text-white'
+                    : 'bg-white/5 text-gray-500'
+                }`}>
+                  {i < queueStageIndex && <span>✓</span>}
+                  {stage}
                 </div>
-              ))}
-            </div>
-          </div>
-
-          <div className="bg-s2 border border-s3/20 rounded-2xl p-6">
-            <p className="text-p3 text-xs uppercase tracking-widest mb-3">Scenes</p>
-            <div className="space-y-2 max-h-64 overflow-auto">
-              {derivedScenes.map((scene, idx) => (
-                <div key={scene.id || idx} className="border border-white/10 rounded-lg px-3 py-2">
-                  <p className="text-xs text-gray-400 mb-1">Scene {idx + 1} • {scene.duration || 4}s</p>
-                  <p className="text-sm">{scene.text}</p>
-                </div>
-              ))}
-            </div>
-          </div>
-        </div>
-
-        <div className="bg-s2 border border-green-500/20 rounded-2xl p-6">
-          <p className="text-p3 text-xs uppercase tracking-widest mb-3">Generated Video</p>
-          {project.videoUrl ? <video controls className="w-full rounded-xl" src={project.videoUrl} /> : <p className="text-gray-400 text-sm">No video yet.</p>}
-          {shareError && <p className="text-red-400 text-sm mt-3">{shareError}</p>}
-
-          {project.mode === 'text' && (
-            <div className="mt-4 rounded-xl border border-white/10 bg-white/5 p-4 space-y-4">
-              <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
-                <select value={titleAlign} onChange={(e) => setTitleAlign(e.target.value)} className="rounded-md bg-white/5 px-3 py-2 text-sm text-white outline outline-1 outline-white/10">
-                  <option value="left">Title Align: Left</option>
-                  <option value="center">Title Align: Center</option>
-                  <option value="right">Title Align: Right</option>
-                </select>
-                <select value={descriptionAlign} onChange={(e) => setDescriptionAlign(e.target.value)} className="rounded-md bg-white/5 px-3 py-2 text-sm text-white outline outline-1 outline-white/10">
-                  <option value="left">Description Align: Left</option>
-                  <option value="center">Description Align: Center</option>
-                  <option value="right">Description Align: Right</option>
-                </select>
-                <select value={textVertical} onChange={(e) => setTextVertical(e.target.value)} className="rounded-md bg-white/5 px-3 py-2 text-sm text-white outline outline-1 outline-white/10">
-                  <option value="top">Text Position: Top</option>
-                  <option value="center">Text Position: Center</option>
-                  <option value="bottom">Text Position: Bottom</option>
-                </select>
-              </div>
-
-              <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
-                <select value={backgroundMode} onChange={(e) => setBackgroundMode(e.target.value)} className="rounded-md bg-white/5 px-3 py-2 text-sm text-white outline outline-1 outline-white/10">
-                  <option value="none">Background: None</option>
-                  <option value="color">Background: Color</option>
-                  <option value="asset">Background: Asset</option>
-                </select>
-
-                {backgroundMode === 'asset' && (
-                  <>
-                    <button
-                      type="button"
-                      onClick={() => setAssetPickerOpen(true)}
-                      className="rounded-md bg-indigo-500 hover:bg-indigo-600 px-3 py-2 text-sm font-semibold text-white"
-                    >
-                      {backgroundAssetUrl ? 'Change Asset' : 'Choose Asset'}
-                    </button>
-                    <label className="inline-flex items-center justify-center rounded-md bg-white/10 hover:bg-white/20 px-3 py-2 text-sm font-semibold text-white cursor-pointer">
-                      {assetLoading ? 'Uploading...' : 'Upload New'}
-                      <input type="file" accept="image/*,video/*" className="hidden" onChange={handleBackgroundUpload} />
-                    </label>
-                  </>
+                {i < QUEUE_STAGES.length - 1 && (
+                  <div className={`w-4 h-0.5 ${i < queueStageIndex ? 'bg-indigo-500' : 'bg-white/10'}`} />
                 )}
+              </div>
+            ))}
+          </div>
+        </div>
+
+        {/* Scenes */}
+        <div className="bg-white/5 border border-white/10 rounded-2xl p-6">
+          <p className="text-gray-400 text-xs uppercase tracking-widest mb-4">Scenes</p>
+          <div className="flex flex-col gap-3">
+            {derivedScenes.map((scene, idx) => (
+              <div key={scene.id || idx} className="bg-white/5 border border-white/10 rounded-xl p-4">
+                <p className="text-gray-500 text-xs mb-1">Scene {idx + 1} • {scene.duration || 4}s</p>
+                <p className="text-white text-sm">{scene.text}</p>
+              </div>
+            ))}
+          </div>
+        </div>
+
+        {/* Style & options (text mode only) */}
+        {project.mode === 'text' && (
+          <div className="bg-white/5 border border-white/10 rounded-2xl p-6 space-y-6">
+            <p className="text-gray-400 text-xs uppercase tracking-widest">Style & Options</p>
+
+            {/* Style */}
+            <div className="flex flex-col gap-2">
+              <label className="text-gray-400 text-xs">Color Style</label>
+              <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
+                {STYLES.map((s) => (
+                  <button
+                    key={s}
+                    type="button"
+                    onClick={() => setSelectedStyle(s)}
+                    className={`px-4 py-2 rounded-xl text-sm font-bold border transition-all capitalize ${
+                      selectedStyle === s
+                        ? 'bg-indigo-500/20 border-indigo-500 text-white'
+                        : 'border-white/10 text-gray-400 hover:border-indigo-500/50'
+                    }`}
+                  >
+                    {s}
+                  </button>
+                ))}
+              </div>
+            </div>
+
+            {/* Text alignment */}
+            <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
+              <div className="flex flex-col gap-2">
+                <label className="text-gray-400 text-xs">Title Align</label>
+                <div className="flex gap-2">
+                  {['left', 'center', 'right'].map((a) => (
+                    <button key={a} type="button" onClick={() => setTitleAlign(a)}
+                      className={`flex-1 py-1.5 rounded-lg text-xs font-bold border transition-all capitalize ${
+                        titleAlign === a ? 'bg-indigo-500 border-indigo-500 text-white' : 'border-white/10 text-gray-400 hover:border-indigo-500/50'
+                      }`}>{a}</button>
+                  ))}
+                </div>
+              </div>
+              <div className="flex flex-col gap-2">
+                <label className="text-gray-400 text-xs">Description Align</label>
+                <div className="flex gap-2">
+                  {['left', 'center', 'right'].map((a) => (
+                    <button key={a} type="button" onClick={() => setDescriptionAlign(a)}
+                      className={`flex-1 py-1.5 rounded-lg text-xs font-bold border transition-all capitalize ${
+                        descriptionAlign === a ? 'bg-indigo-500 border-indigo-500 text-white' : 'border-white/10 text-gray-400 hover:border-indigo-500/50'
+                      }`}>{a}</button>
+                  ))}
+                </div>
+              </div>
+              <div className="flex flex-col gap-2">
+                <label className="text-gray-400 text-xs">Vertical Position</label>
+                <div className="flex gap-2">
+                  {['top', 'center', 'bottom'].map((a) => (
+                    <button key={a} type="button" onClick={() => setTextVertical(a)}
+                      className={`flex-1 py-1.5 rounded-lg text-xs font-bold border transition-all capitalize ${
+                        textVertical === a ? 'bg-indigo-500 border-indigo-500 text-white' : 'border-white/10 text-gray-400 hover:border-indigo-500/50'
+                      }`}>{a}</button>
+                  ))}
+                </div>
+              </div>
+            </div>
+
+            {/* Background mode */}
+            <div className="flex flex-col gap-3">
+              <label className="text-gray-400 text-xs">Background</label>
+              <div className="flex gap-3">
+                {['none', 'color', 'asset'].map((m) => (
+                  <button key={m} type="button" onClick={() => setBackgroundMode(m)}
+                    className={`px-4 py-2 rounded-xl text-sm font-bold border transition-all capitalize ${
+                      backgroundMode === m ? 'bg-indigo-500 border-indigo-500 text-white' : 'border-white/10 text-gray-400 hover:border-indigo-500/50'
+                    }`}>{m}</button>
+                ))}
               </div>
 
               {backgroundMode === 'color' && (
-                <div className="flex flex-wrap gap-2">
-                  {['#0f0f0f', '#1a0533', '#0a1628', '#111827', '#1f2937', '#f5f5f5'].map((color) => (
-                    <button
-                      key={color}
-                      type="button"
-                      onClick={() => setBackgroundColor(color)}
-                      className={`h-8 w-8 rounded-full border-2 ${backgroundColor === color ? 'border-white' : 'border-transparent'}`}
-                      style={{ backgroundColor: color }}
-                    />
-                  ))}
+                <div className="flex items-center gap-3">
+                  <input
+                    type="color"
+                    value={backgroundColor}
+                    onChange={(e) => setBackgroundColor(e.target.value)}
+                    className="w-10 h-10 rounded-lg border border-white/10 cursor-pointer bg-transparent"
+                  />
+                  <span className="text-gray-400 text-sm font-mono">{backgroundColor}</span>
                 </div>
               )}
 
-              <input value={musicUrl} onChange={(e) => setMusicUrl(e.target.value)} placeholder="Optional music URL (.mp3)" className="w-full rounded-md bg-white/5 px-3 py-2 text-sm text-white outline outline-1 outline-white/10" />
-
-              {assetPickerOpen && (
-                <div className="fixed inset-0 z-40 bg-black/70 flex items-center justify-center p-4">
-                  <div className="w-full max-w-3xl rounded-2xl border border-white/10 bg-gray-900 p-4">
-                    <div className="flex items-center justify-between mb-4">
-                      <h3 className="text-lg font-bold">Choose Background Asset</h3>
-                      <button type="button" onClick={() => setAssetPickerOpen(false)} className="text-gray-400 hover:text-white">Close</button>
-                    </div>
-                    <div className="grid grid-cols-2 md:grid-cols-3 gap-3 max-h-[60vh] overflow-auto">
-                      {assets.map((asset) => (
-                        <button
-                          key={asset.$id}
-                          type="button"
-                          onClick={() => {
-                            setBackgroundMode('asset')
-                            setBackgroundAssetType((asset.name || '').match(/\.(mp4|mov|webm)$/i) ? 'video' : 'image')
-                            setBackgroundAssetUrl(asset.url)
-                            setAssetPickerOpen(false)
-                          }}
-                          className="rounded-xl border border-white/10 bg-white/5 p-2 text-left hover:border-indigo-400"
-                        >
-                          {asset.url.match(/\.(mp4|mov|webm)(\?|$)/i) ? (
-                            <video src={asset.url} className="w-full h-24 object-cover rounded-md mb-2" />
-                          ) : (
-                            <img src={asset.url} alt={asset.name} className="w-full h-24 object-cover rounded-md mb-2" />
-                          )}
-                          <p className="text-xs truncate">{asset.name}</p>
-                        </button>
-                      ))}
-                    </div>
+              {backgroundMode === 'asset' && (
+                <div className="flex flex-col gap-3">
+                  <div className="flex gap-3">
+                    {['image', 'video'].map((t) => (
+                      <button key={t} type="button" onClick={() => setBackgroundAssetType(t)}
+                        className={`px-4 py-2 rounded-xl text-sm font-bold border transition-all capitalize ${
+                          backgroundAssetType === t ? 'bg-indigo-500 border-indigo-500 text-white' : 'border-white/10 text-gray-400 hover:border-indigo-500/50'
+                        }`}>{t}</button>
+                    ))}
                   </div>
+
+                  {/* Upload */}
+                  <label className="flex items-center gap-3 cursor-pointer bg-white/5 border border-white/10 rounded-xl px-4 py-3 hover:border-indigo-500/50 transition-colors">
+                    <span className="text-gray-400 text-sm">{assetLoading ? 'Uploading...' : 'Upload background file'}</span>
+                    <input type="file" accept="image/*,video/*" onChange={handleBackgroundUpload} className="hidden" />
+                  </label>
+
+                  {/* Asset picker */}
+                  {assets.length > 0 && (
+                    <div>
+                      <button
+                        type="button"
+                        onClick={() => setAssetPickerOpen(!assetPickerOpen)}
+                        className="text-indigo-400 text-sm hover:underline"
+                      >
+                        {assetPickerOpen ? 'Hide' : 'Pick from saved assets'}
+                      </button>
+                      {assetPickerOpen && (
+                        <div className="grid grid-cols-3 gap-3 mt-3">
+                          {assets.map((asset) => (
+                            <button
+                              key={asset.$id}
+                              type="button"
+                              onClick={() => {
+                                setBackgroundAssetUrl(asset.url)
+                                setAssetPickerOpen(false)
+                              }}
+                              className={`rounded-xl overflow-hidden border-2 transition-all ${
+                                backgroundAssetUrl === asset.url ? 'border-indigo-500' : 'border-white/10 hover:border-indigo-500/50'
+                              }`}
+                            >
+                              <img src={asset.url} alt={asset.name} className="w-full h-16 object-cover" />
+                            </button>
+                          ))}
+                        </div>
+                      )}
+                    </div>
+                  )}
+
+                  {backgroundAssetUrl && (
+                    <input
+                      type="text"
+                      value={backgroundAssetUrl}
+                      onChange={(e) => setBackgroundAssetUrl(e.target.value)}
+                      placeholder="Or paste asset URL directly"
+                      className="bg-white/5 border border-white/10 rounded-xl px-4 py-2 text-sm text-white placeholder-gray-600 focus:outline-none focus:border-indigo-500 transition-colors"
+                    />
+                  )}
                 </div>
               )}
             </div>
-          )}
 
-          <div className="grid grid-cols-1 md:grid-cols-3 gap-3 mt-4">
-            <input type="number" min={1} value={shareExpiryHours} onChange={(e) => setShareExpiryHours(Number(e.target.value || 72))} className="rounded-md bg-white/5 px-3 py-2 text-sm text-white outline outline-1 outline-white/10" />
-            <input type="password" placeholder="Share password (optional)" value={sharePassword} onChange={(e) => setSharePassword(e.target.value)} className="rounded-md bg-white/5 px-3 py-2 text-sm text-white outline outline-1 outline-white/10" />
-            <label className="inline-flex items-center gap-2 text-sm text-gray-300"><input type="checkbox" checked={disableDownload} onChange={(e) => setDisableDownload(e.target.checked)} /> Disable download</label>
-          </div>
-
-          <div className="flex gap-3 mt-4 flex-wrap">
-            <button onClick={handleGenerate} disabled={generating} className="bg-p1 hover:bg-p1/80 text-white font-bold px-6 py-2.5 rounded-xl disabled:opacity-60">
-              {generating ? 'Generating...' : 'Generate / Regenerate'}
-            </button>
-            <button onClick={handleShare} disabled={shareLoading || !project.videoUrl} className="border border-s3/20 text-p3 hover:text-p1 px-5 py-2.5 rounded-xl text-sm disabled:opacity-60">
-              {shareCopied ? 'Link copied!' : shareLoading ? 'Creating link...' : 'Share'}
-            </button>
-            {genError && <p className="text-red-400 text-sm">{genError}</p>}
-          </div>
-        </div>
-
-        <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-          <div className="bg-s2 border border-s3/20 rounded-2xl p-6">
-            <p className="text-p3 text-xs uppercase tracking-widest mb-3">Collaborators</p>
-            <div className="flex gap-2 mb-3">
-              <input value={inviteEmail} onChange={(e) => setInviteEmail(e.target.value)} placeholder="teammate@email.com" className="flex-1 rounded-md bg-white/5 px-3 py-2 text-sm text-white outline outline-1 outline-white/10" />
-              <button onClick={addCollaborator} className="bg-indigo-500 hover:bg-indigo-600 px-4 py-2 rounded-md text-sm font-semibold">Invite</button>
+            {/* Music URL */}
+            <div className="flex flex-col gap-2">
+              <label className="text-gray-400 text-xs">Background Music URL (optional)</label>
+              <input
+                type="text"
+                value={musicUrl}
+                onChange={(e) => setMusicUrl(e.target.value)}
+                placeholder="https://..."
+                className="bg-white/5 border border-white/10 rounded-xl px-4 py-2 text-sm text-white placeholder-gray-600 focus:outline-none focus:border-indigo-500 transition-colors"
+              />
             </div>
-            <p className="text-xs text-gray-500 mb-2">No SMTP service configured yet, so invite opens your email client.</p>
-            <ul className="space-y-2">{collaborators.map((email) => <li key={email} className="text-sm border border-white/10 rounded-md px-3 py-2">{email}</li>)}</ul>
           </div>
+        )}
 
-          <div className="bg-s2 border border-s3/20 rounded-2xl p-6">
-            <p className="text-p3 text-xs uppercase tracking-widest mb-3">Comments</p>
-            <div className="flex gap-2 mb-3">
-              <input value={commentText} onChange={(e) => setCommentText(e.target.value)} placeholder="Leave feedback..." className="flex-1 rounded-md bg-white/5 px-3 py-2 text-sm text-white outline outline-1 outline-white/10" />
-              <button onClick={addProjectComment} className="bg-indigo-500 hover:bg-indigo-600 px-4 py-2 rounded-md text-sm font-semibold">Add</button>
+        {/* Generate button */}
+        {genError && (
+          <p className="text-red-400 text-sm bg-red-500/10 border border-red-500/20 rounded-xl px-4 py-3">
+            {genError}
+          </p>
+        )}
+        <button
+          onClick={handleGenerate}
+          disabled={generating || project.status === 'processing'}
+          className="w-full bg-indigo-500 hover:bg-indigo-600 disabled:opacity-50 text-white font-bold px-8 py-4 rounded-xl transition-colors"
+        >
+          {generating ? (
+            <span className="flex items-center justify-center gap-2">
+              <span className="size-4 border-2 border-white/30 border-t-white rounded-full animate-spin" />
+              {queueStage}...
+            </span>
+          ) : project.status === 'completed' ? '🔄 Regenerate Video' : '✨ Generate Video'}
+        </button>
+
+        {/* Video player */}
+        {project.videoUrl && (
+          <div className="bg-white/5 border border-green-500/20 rounded-2xl p-6">
+            <p className="text-gray-400 text-xs uppercase tracking-widest mb-4">Generated Video</p>
+            <video controls className="w-full rounded-xl" src={project.videoUrl} />
+            <div className="flex gap-3 mt-4 flex-wrap">
+              <a
+                href={project.videoUrl}
+                download
+                target="_blank"
+                rel="noreferrer"
+                className="bg-indigo-500 hover:bg-indigo-600 text-white font-bold px-5 py-2.5 rounded-xl text-sm transition-colors"
+              >
+                ⬇ Download
+              </a>
+              <button
+                onClick={handleShare}
+                disabled={shareLoading}
+                className="border border-white/10 text-gray-400 hover:text-white px-5 py-2.5 rounded-xl text-sm transition-colors"
+              >
+                {shareCopied ? '✅ Link Copied!' : shareLoading ? 'Generating...' : '🔗 Share'}
+              </button>
             </div>
-            <ul className="space-y-2 max-h-56 overflow-auto">
-              {comments.map((comment) => (
-                <li key={comment.$id} className="border border-white/10 rounded-md px-3 py-2">
-                  <p className="text-sm">{comment.text}</p>
-                  <p className="text-xs text-gray-500 mt-1">{comment.author}</p>
-                </li>
+            {shareError && <p className="text-red-400 text-sm mt-2">{shareError}</p>}
+
+            {/* Share options */}
+            <div className="mt-4 pt-4 border-t border-white/10 grid grid-cols-1 sm:grid-cols-3 gap-4">
+              <div className="flex flex-col gap-1">
+                <label className="text-gray-500 text-xs">Expires in</label>
+                <select
+                  value={shareExpiryHours}
+                  onChange={(e) => setShareExpiryHours(Number(e.target.value))}
+                  className="bg-white/5 border border-white/10 rounded-lg px-3 py-2 text-sm text-white focus:outline-none"
+                >
+                  <option value={24}>24 hours</option>
+                  <option value={72}>3 days</option>
+                  <option value={168}>7 days</option>
+                  <option value={720}>30 days</option>
+                </select>
+              </div>
+              <div className="flex flex-col gap-1">
+                <label className="text-gray-500 text-xs">Password (optional)</label>
+                <input
+                  type="text"
+                  value={sharePassword}
+                  onChange={(e) => setSharePassword(e.target.value)}
+                  placeholder="Leave blank for none"
+                  className="bg-white/5 border border-white/10 rounded-lg px-3 py-2 text-sm text-white placeholder-gray-600 focus:outline-none"
+                />
+              </div>
+              <div className="flex items-end pb-1">
+                <label className="flex items-center gap-2 cursor-pointer">
+                  <input
+                    type="checkbox"
+                    checked={disableDownload}
+                    onChange={(e) => setDisableDownload(e.target.checked)}
+                    className="accent-indigo-500"
+                  />
+                  <span className="text-gray-400 text-sm">Disable download</span>
+                </label>
+              </div>
+            </div>
+          </div>
+        )}
+
+        {/* Collaborators */}
+        <div className="bg-white/5 border border-white/10 rounded-2xl p-6">
+          <p className="text-gray-400 text-xs uppercase tracking-widest mb-4">Collaborators</p>
+          <p className="text-gray-600 text-xs mb-3">No SMTP service configured yet, so invite opens your email client.</p>
+          <div className="flex gap-2 mb-4">
+            <input
+              type="email"
+              value={inviteEmail}
+              onChange={(e) => setInviteEmail(e.target.value)}
+              placeholder="collaborator@email.com"
+              className="flex-1 bg-white/5 border border-white/10 rounded-xl px-4 py-2 text-sm text-white placeholder-gray-600 focus:outline-none focus:border-indigo-500 transition-colors"
+            />
+            <button
+              onClick={addCollaborator}
+              className="bg-indigo-500 hover:bg-indigo-600 text-white font-bold px-4 py-2 rounded-xl text-sm transition-colors"
+            >
+              Invite
+            </button>
+          </div>
+          {collaborators.length > 0 && (
+            <div className="flex flex-col gap-2">
+              {collaborators.map((email) => (
+                <div key={email} className="flex items-center gap-2 text-sm text-gray-400">
+                  <span className="w-2 h-2 bg-indigo-500 rounded-full" />
+                  {email}
+                </div>
               ))}
-            </ul>
-          </div>
-        </div>
-
-        <div className="flex items-center justify-between">
-          <Link to={`/projects/${id}/edit`} className="text-p3 text-sm hover:text-p1 transition-colors border border-s3/20 px-5 py-2.5 rounded-xl">Edit Project</Link>
-          {!showConfirm ? (
-            <button onClick={() => setShowConfirm(true)} className="text-red-400 text-sm hover:text-red-300 border border-red-500/20 px-5 py-2.5 rounded-xl">Delete Project</button>
-          ) : (
-            <div className="flex items-center gap-3">
-              <button onClick={() => setShowConfirm(false)} className="text-p3 text-sm px-4 py-2 rounded-xl border border-s3/20">Cancel</button>
-              <button onClick={handleDelete} disabled={deleting} className="bg-red-500/20 text-red-400 text-sm font-bold px-4 py-2 rounded-xl disabled:opacity-50">{deleting ? 'Deleting...' : 'Yes, delete'}</button>
             </div>
           )}
         </div>
+
+        {/* Comments */}
+        <div className="bg-white/5 border border-white/10 rounded-2xl p-6">
+          <p className="text-gray-400 text-xs uppercase tracking-widest mb-4">Comments</p>
+          <div className="flex gap-2 mb-4">
+            <input
+              type="text"
+              value={commentText}
+              onChange={(e) => setCommentText(e.target.value)}
+              placeholder="Add a comment..."
+              className="flex-1 bg-white/5 border border-white/10 rounded-xl px-4 py-2 text-sm text-white placeholder-gray-600 focus:outline-none focus:border-indigo-500 transition-colors"
+            />
+            <button
+              onClick={addProjectComment}
+              className="bg-indigo-500 hover:bg-indigo-600 text-white font-bold px-4 py-2 rounded-xl text-sm transition-colors"
+            >
+              Post
+            </button>
+          </div>
+          {comments.length > 0 && (
+            <div className="flex flex-col gap-3">
+              {comments.map((comment) => (
+                <div key={comment.$id || comment.id} className="bg-white/5 border border-white/10 rounded-xl p-4">
+                  <p className="text-white text-sm">{comment.text}</p>
+                  <p className="text-gray-500 text-xs mt-1">{comment.author}</p>
+                </div>
+              ))}
+            </div>
+          )}
+        </div>
+
+        {/* Danger zone */}
+        <div className="bg-red-500/5 border border-red-500/20 rounded-2xl p-6">
+          <p className="text-gray-400 text-xs uppercase tracking-widest mb-4">Danger Zone</p>
+          {!showConfirm ? (
+            <button
+              onClick={() => setShowConfirm(true)}
+              className="text-red-400 border border-red-500/30 hover:bg-red-500/10 px-5 py-2.5 rounded-xl text-sm font-bold transition-colors"
+            >
+              🗑 Delete Project
+            </button>
+          ) : (
+            <div className="flex flex-col gap-3">
+              <p className="text-gray-300 text-sm">Are you sure? This cannot be undone.</p>
+              <div className="flex gap-3">
+                <button
+                  onClick={() => setShowConfirm(false)}
+                  className="border border-white/10 text-gray-400 px-5 py-2.5 rounded-xl text-sm transition-colors"
+                >
+                  Cancel
+                </button>
+                <button
+                  onClick={handleDelete}
+                  disabled={deleting}
+                  className="bg-red-500 hover:bg-red-600 text-white font-bold px-5 py-2.5 rounded-xl text-sm transition-colors disabled:opacity-50"
+                >
+                  {deleting ? 'Deleting...' : 'Yes, delete'}
+                </button>
+              </div>
+            </div>
+          )}
+        </div>
+
       </div>
     </div>
   )
