@@ -4,13 +4,6 @@ import { Link, useNavigate } from 'react-router-dom'
 import { uploadImage } from '../lib/upload'
 import { listAssets } from '../lib/collaboration'
 
-const STYLES = [
-  { id: 'clean', label: 'Clean', desc: 'Light & modern' },
-  { id: 'bold', label: 'Bold', desc: 'High contrast purple' },
-  { id: 'minimal', label: 'Minimal', desc: 'Simple & elegant' },
-  { id: 'corporate', label: 'Corporate', desc: 'Professional blue' },
-]
-
 const NewProject = () => {
   const { createProject } = useProjects()
   const navigate = useNavigate()
@@ -18,7 +11,6 @@ const NewProject = () => {
   const [formData, setFormData] = useState({
     title: '',
     description: '',
-    style: 'clean',
     mode: 'text',
     imageUrl: ''
   })
@@ -81,7 +73,6 @@ const NewProject = () => {
       const project = await createProject({
         title: formData.title,
         description: formData.description,
-        style: formData.style || 'clean',  // ← fixed
         mode,
         imageUrl: sourceImageUrl
       })
@@ -106,7 +97,7 @@ const NewProject = () => {
 
       <div className="max-w-2xl mx-auto px-6 py-12">
         <h1 className="text-3xl font-bold mb-2">New Project</h1>
-        <p className="text-gray-400 mb-10">Configure your video and click Create.</p>
+        <p className="text-gray-400 mb-10">Set your title and script, then customize colors and style inside the project.</p>
 
         <form onSubmit={handleSubmit} className="flex flex-col gap-8">
 
@@ -151,6 +142,7 @@ const NewProject = () => {
                 onChange={(e) => setFormData((prev) => ({ ...prev, description: e.target.value }))}
                 className="bg-white/5 border border-white/10 rounded-xl px-4 py-3 text-white placeholder-gray-600 focus:outline-none focus:border-indigo-500 transition-colors resize-none"
               />
+              <p className="text-gray-600 text-xs">Each sentence becomes a scene. Up to 4 scenes will be rendered.</p>
             </div>
           )}
 
@@ -159,7 +151,6 @@ const NewProject = () => {
             <div className="flex flex-col gap-4">
               <label className="text-gray-400 text-xs uppercase tracking-widest">Source Image</label>
 
-              {/* Drop zone */}
               <div
                 onDrop={handleDrop}
                 onDragOver={(e) => e.preventDefault()}
@@ -183,7 +174,6 @@ const NewProject = () => {
                 className="hidden"
               />
 
-              {/* Saved assets picker */}
               {savedAssets.length > 0 && (
                 <div className="flex flex-col gap-2">
                   <p className="text-gray-400 text-xs uppercase tracking-widest">Or pick from saved assets</p>
@@ -207,30 +197,6 @@ const NewProject = () => {
                   </div>
                 </div>
               )}
-            </div>
-          )}
-
-          {/* ← Style selector (fixed) */}
-          {mode === 'text' && (
-            <div className="flex flex-col gap-3">
-              <label className="text-gray-400 text-xs uppercase tracking-widest">Style</label>
-              <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
-                {STYLES.map((s) => (
-                  <button
-                    key={s.id}
-                    type="button"
-                    onClick={() => setFormData((prev) => ({ ...prev, style: s.id }))}
-                    className={`flex flex-col items-start px-4 py-3 rounded-xl text-sm border transition-all ${
-                      formData.style === s.id
-                        ? 'bg-indigo-500/20 border-indigo-500 text-white'
-                        : 'border-white/10 text-gray-400 hover:border-indigo-500/50'
-                    }`}
-                  >
-                    <span className="font-bold capitalize">{s.label}</span>
-                    <span className="text-xs text-gray-500 mt-0.5">{s.desc}</span>
-                  </button>
-                ))}
-              </div>
             </div>
           )}
 
