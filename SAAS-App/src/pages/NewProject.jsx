@@ -11,6 +11,7 @@ const NewProject = () => {
   const [formData, setFormData] = useState({
     title: '',
     description: '',
+    style: 'clean',
     mode: 'text',
     imageUrl: ''
   })
@@ -73,10 +74,11 @@ const NewProject = () => {
       const project = await createProject({
         title: formData.title,
         description: formData.description,
-        style: 'clean',
+        style: formData.style || 'clean',
         mode,
         imageUrl: sourceImageUrl
       })
+
 
       navigate(`/projects/${project.$id}`)
     } catch {

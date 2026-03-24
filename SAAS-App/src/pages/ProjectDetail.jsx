@@ -171,7 +171,11 @@ const ProjectDetail = () => {
       if (project.mode === 'image') {
         renderId = await submitImageRender(project.sourceImageUrl, timelineText || 'Cinematic slow camera movement')
       } else {
-        renderId = await submitRender(project.title, timelineText || project.description, 'clean', {
+        renderId = await submitRender(
+        project.title,
+        timelineText || project.description,
+        project.style || 'clean',
+        {
           titleAlign,
           descriptionAlign,
           textVertical,
@@ -180,7 +184,9 @@ const ProjectDetail = () => {
           backgroundAssetType,
           backgroundAssetUrl,
           musicUrl
-        })
+        }
+)
+
       }
 
       setQueueStage('Rendering')
