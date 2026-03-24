@@ -13,39 +13,39 @@ import EditProject from './pages/EditProject'
 import ShareView from './pages/ShareView'
 import Billing from './pages/Billing'
 import Assets from './pages/Assets'
-
+import NotFound from './pages/NotFound'
 
 const App = () => (
   <Routes>
-  <Route path="/" element={<LandingPage />} />
-  <Route path="/login" element={<Login />} />
-  <Route path="/signup" element={<Signup />} />
-  <Route path="/forgot-password" element={<ForgotPassword />} />
-  <Route path="/reset-password" element={<ResetPassword />} />
-  <Route path="/dashboard" element={
-    <ProtectedRoute><Dashboard /></ProtectedRoute>
-  } />
-  <Route path="/change-password" element={
-    <ProtectedRoute><ChangePassword /></ProtectedRoute>
-  } />
-  <Route path="/projects/new" element={
-  <ProtectedRoute><NewProject /></ProtectedRoute>
-} />
-  <Route path="/projects/:id" element={
-  <ProtectedRoute><ProjectDetail /></ProtectedRoute>
-} />
-  <Route path="/projects/:id/edit" element={
-  <ProtectedRoute><EditProject /></ProtectedRoute>
-} />
-<Route path="/share/:projectId" element={<ShareView />} />
-<Route path="/billing" element={
-  <ProtectedRoute><Billing /></ProtectedRoute>
-} />
-<Route path="/assets" element={
-  <ProtectedRoute><Assets /></ProtectedRoute>
-} />
-</Routes>
-
+    <Route path="/" element={<LandingPage />} />
+    <Route path="/login" element={<Login />} />
+    <Route path="/signup" element={<Signup />} />
+    <Route path="/forgot-password" element={<ForgotPassword />} />
+    <Route path="/reset-password" element={<ResetPassword />} />
+    <Route path="/share/:projectId" element={<ShareView />} />
+    <Route path="/dashboard" element={
+      <ProtectedRoute><Dashboard /></ProtectedRoute>
+    } />
+    <Route path="/change-password" element={
+      <ProtectedRoute><ChangePassword /></ProtectedRoute>
+    } />
+    <Route path="/projects/new" element={
+      <ProtectedRoute><NewProject /></ProtectedRoute>
+    } />
+    <Route path="/projects/:id" element={
+      <ProtectedRoute><ProjectDetail /></ProtectedRoute>
+    } />
+    <Route path="/projects/:id/edit" element={
+      <ProtectedRoute><EditProject /></ProtectedRoute>
+    } />
+    <Route path="/billing" element={
+      <ProtectedRoute><Billing /></ProtectedRoute>
+    } />
+    <Route path="/assets" element={
+      <ProtectedRoute><Assets /></ProtectedRoute>
+    } />
+    <Route path="*" element={<NotFound />} />
+  </Routes>
 )
 
 export default App

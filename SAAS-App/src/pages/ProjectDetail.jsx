@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from 'react'
+import { useEffect, useRef, useMemo, useState } from 'react'
 import { Link, useNavigate, useParams } from 'react-router-dom'
 import { databases, ID } from '../lib/appwrite'
 import { submitImageRender, submitRender, pollRender } from '../lib/shotstack'
@@ -7,6 +7,10 @@ import { useProjects } from '../context/ProjectsContext'
 import { addComment, addAsset, getCollaborators, getComments, listAssets, getScenes, saveCollaborators } from '../lib/collaboration'
 import { uploadImage } from '../lib/upload'
 import { APPWRITE_DATABASE_ID, APPWRITE_PROJECTS_COLLECTION_ID, APPWRITE_SHARES_COLLECTION_ID } from '../lib/config'
+import StyleOptions from '../components/project/StyleOptions'
+import SharePanel from '../components/project/SharePanel'
+import CollaboratorsPanel from '../components/project/CollaboratorsPanel'
+import CommentsPanel from '../components/project/CommentsPanel'
 
 const QUEUE_STAGES = ['Queued', 'Preparing timeline', 'Rendering', 'Finalizing', 'Completed']
 
@@ -15,6 +19,7 @@ const ProjectDetail = () => {
   const navigate = useNavigate()
   const { user } = useAuth()
   const { deleteProject, incrementUserRenders, getUserRendersLeft } = useProjects()
+  const pollingRef = useRef(null)
 
   const [project, setProject] = useState(null)
   const [loading, setLoading] = useState(true)
@@ -34,7 +39,6 @@ const ProjectDetail = () => {
   const [inviteEmail, setInviteEmail] = useState('')
   const [commentText, setCommentText] = useState('')
 
-  // All user-controlled render options — no presets
   const [titleColor, setTitleColor] = useState('#6366f1')
   const [textColor, setTextColor] = useState('#ffffff')
   const [titleSize, setTitleSize] = useState(58)
@@ -83,6 +87,13 @@ const ProjectDetail = () => {
 
   useEffect(() => { fetchProject() }, [id, user?.$id])
 
+  // Clear polling interval on unmount to prevent memory leaks
+  useEffect(() => {
+    return () => {
+      if (pollingRef.current) clearInterval(pollingRef.current)
+    }
+  }, [])
+
   useEffect(() => {
     if (project?.status === 'completed' || project?.videoUrl) {
       setQueueStage('Completed')
@@ -103,12 +114,14 @@ const ProjectDetail = () => {
 
   const queueStageIndex = Math.max(0, QUEUE_STAGES.indexOf(queueStage))
 
-  const startPolling = async (renderId) => {
-    const interval = setInterval(async () => {
+  const startPolling = (renderId) => {
+    if (pollingRef.current) clearInterval(pollingRef.current)
+    pollingRef.current = setInterval(async () => {
       try {
         const { status, url } = await pollRender(renderId)
         if (status === 'done') {
-          clearInterval(interval)
+          clearInterval(pollingRef.current)
+          pollingRef.current = null
           await databases.updateDocument({
             databaseId: APPWRITE_DATABASE_ID,
             collectionId: APPWRITE_PROJECTS_COLLECTION_ID,
@@ -120,7 +133,8 @@ const ProjectDetail = () => {
           setGenerating(false)
           setQueueStage('Completed')
         } else if (status === 'failed') {
-          clearInterval(interval)
+          clearInterval(pollingRef.current)
+          pollingRef.current = null
           await databases.updateDocument({
             databaseId: APPWRITE_DATABASE_ID,
             collectionId: APPWRITE_PROJECTS_COLLECTION_ID,
@@ -134,7 +148,8 @@ const ProjectDetail = () => {
           setQueueStage('Rendering')
         }
       } catch {
-        clearInterval(interval)
+        clearInterval(pollingRef.current)
+        pollingRef.current = null
         setGenError('Error checking render status.')
         setGenerating(false)
       }
@@ -168,20 +183,12 @@ const ProjectDetail = () => {
         renderId = await submitRender(
           project.title,
           timelineText || project.description,
-          null, // style no longer used
+          null,
           {
-            titleAlign,
-            descriptionAlign,
-            textVertical,
-            backgroundMode,
-            backgroundColor,
-            backgroundAssetType,
-            backgroundAssetUrl,
-            musicUrl,
-            titleColor,
-            textColor,
-            titleSize,
-            textSize,
+            titleAlign, descriptionAlign, textVertical,
+            backgroundMode, backgroundColor, backgroundAssetType,
+            backgroundAssetUrl, musicUrl, titleColor, textColor,
+            titleSize, textSize,
           }
         )
       }
@@ -274,8 +281,7 @@ const ProjectDetail = () => {
 
   const addCollaborator = async () => {
     const email = inviteEmail.trim().toLowerCase()
-    if (!email) return
-    if (collaborators.includes(email)) return
+    if (!email || collaborators.includes(email)) return
     const next = [...collaborators, email]
     await saveCollaborators(id, next)
     setCollaborators(next)
@@ -328,7 +334,6 @@ const ProjectDetail = () => {
   return (
     <div className="min-h-screen bg-gray-900 text-white flex flex-col">
 
-      {/* Header */}
       <header className="border-b border-white/10 px-6 py-4 flex items-center justify-between sticky top-0 z-10 backdrop-blur-sm bg-gray-900/80">
         <Link to="/dashboard">
           <img src="/images/xora.svg" width={120} height={48} alt="Xora" />
@@ -394,155 +399,26 @@ const ProjectDetail = () => {
           </div>
         </div>
 
-        {/* Style & Options — text mode only, fully user-controlled */}
+        {/* Style Options — text mode only */}
         {project.mode === 'text' && (
-          <div className="bg-white/5 border border-white/10 rounded-2xl p-6 space-y-6">
-            <p className="text-gray-400 text-xs uppercase tracking-widest">Style & Options</p>
-
-            {/* Colors */}
-            <div className="flex flex-wrap gap-6">
-              <div className="flex flex-col gap-1">
-                <label className="text-gray-400 text-xs">Title Color</label>
-                <div className="flex items-center gap-2">
-                  <input type="color" value={titleColor} onChange={(e) => setTitleColor(e.target.value)}
-                    className="w-10 h-10 rounded-lg border border-white/10 cursor-pointer bg-transparent" />
-                  <span className="text-gray-500 text-xs font-mono">{titleColor}</span>
-                </div>
-              </div>
-              <div className="flex flex-col gap-1">
-                <label className="text-gray-400 text-xs">Text Color</label>
-                <div className="flex items-center gap-2">
-                  <input type="color" value={textColor} onChange={(e) => setTextColor(e.target.value)}
-                    className="w-10 h-10 rounded-lg border border-white/10 cursor-pointer bg-transparent" />
-                  <span className="text-gray-500 text-xs font-mono">{textColor}</span>
-                </div>
-              </div>
-            </div>
-
-            {/* Font sizes */}
-            <div className="grid grid-cols-2 gap-4">
-              <div className="flex flex-col gap-1">
-                <label className="text-gray-400 text-xs">Title Size — {titleSize}px</label>
-                <input type="range" min={28} max={96} value={titleSize}
-                  onChange={(e) => setTitleSize(Number(e.target.value))}
-                  className="accent-indigo-500" />
-              </div>
-              <div className="flex flex-col gap-1">
-                <label className="text-gray-400 text-xs">Text Size — {textSize}px</label>
-                <input type="range" min={18} max={72} value={textSize}
-                  onChange={(e) => setTextSize(Number(e.target.value))}
-                  className="accent-indigo-500" />
-              </div>
-            </div>
-
-            {/* Alignment */}
-            <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
-              <div className="flex flex-col gap-2">
-                <label className="text-gray-400 text-xs">Title Align</label>
-                <div className="flex gap-2">
-                  {['left', 'center', 'right'].map((a) => (
-                    <button key={a} type="button" onClick={() => setTitleAlign(a)}
-                      className={`flex-1 py-1.5 rounded-lg text-xs font-bold border transition-all capitalize ${
-                        titleAlign === a ? 'bg-indigo-500 border-indigo-500 text-white' : 'border-white/10 text-gray-400 hover:border-indigo-500/50'
-                      }`}>{a}</button>
-                  ))}
-                </div>
-              </div>
-              <div className="flex flex-col gap-2">
-                <label className="text-gray-400 text-xs">Description Align</label>
-                <div className="flex gap-2">
-                  {['left', 'center', 'right'].map((a) => (
-                    <button key={a} type="button" onClick={() => setDescriptionAlign(a)}
-                      className={`flex-1 py-1.5 rounded-lg text-xs font-bold border transition-all capitalize ${
-                        descriptionAlign === a ? 'bg-indigo-500 border-indigo-500 text-white' : 'border-white/10 text-gray-400 hover:border-indigo-500/50'
-                      }`}>{a}</button>
-                  ))}
-                </div>
-              </div>
-              <div className="flex flex-col gap-2">
-                <label className="text-gray-400 text-xs">Vertical Position</label>
-                <div className="flex gap-2">
-                  {['top', 'center', 'bottom'].map((a) => (
-                    <button key={a} type="button" onClick={() => setTextVertical(a)}
-                      className={`flex-1 py-1.5 rounded-lg text-xs font-bold border transition-all capitalize ${
-                        textVertical === a ? 'bg-indigo-500 border-indigo-500 text-white' : 'border-white/10 text-gray-400 hover:border-indigo-500/50'
-                      }`}>{a}</button>
-                  ))}
-                </div>
-              </div>
-            </div>
-
-            {/* Background */}
-            <div className="flex flex-col gap-3">
-              <label className="text-gray-400 text-xs">Background</label>
-              <div className="flex gap-3">
-                {['none', 'color', 'asset'].map((m) => (
-                  <button key={m} type="button" onClick={() => setBackgroundMode(m)}
-                    className={`px-4 py-2 rounded-xl text-sm font-bold border transition-all capitalize ${
-                      backgroundMode === m ? 'bg-indigo-500 border-indigo-500 text-white' : 'border-white/10 text-gray-400 hover:border-indigo-500/50'
-                    }`}>{m}</button>
-                ))}
-              </div>
-
-              {backgroundMode === 'color' && (
-                <div className="flex items-center gap-3">
-                  <input type="color" value={backgroundColor} onChange={(e) => setBackgroundColor(e.target.value)}
-                    className="w-10 h-10 rounded-lg border border-white/10 cursor-pointer bg-transparent" />
-                  <span className="text-gray-400 text-sm font-mono">{backgroundColor}</span>
-                </div>
-              )}
-
-              {backgroundMode === 'asset' && (
-                <div className="flex flex-col gap-3">
-                  <div className="flex gap-3">
-                    {['image', 'video'].map((t) => (
-                      <button key={t} type="button" onClick={() => setBackgroundAssetType(t)}
-                        className={`px-4 py-2 rounded-xl text-sm font-bold border transition-all capitalize ${
-                          backgroundAssetType === t ? 'bg-indigo-500 border-indigo-500 text-white' : 'border-white/10 text-gray-400 hover:border-indigo-500/50'
-                        }`}>{t}</button>
-                    ))}
-                  </div>
-                  <label className="flex items-center gap-3 cursor-pointer bg-white/5 border border-white/10 rounded-xl px-4 py-3 hover:border-indigo-500/50 transition-colors">
-                    <span className="text-gray-400 text-sm">{assetLoading ? 'Uploading...' : 'Upload background file'}</span>
-                    <input type="file" accept="image/*,video/*" onChange={handleBackgroundUpload} className="hidden" />
-                  </label>
-                  {assets.length > 0 && (
-                    <div>
-                      <button type="button" onClick={() => setAssetPickerOpen(!assetPickerOpen)}
-                        className="text-indigo-400 text-sm hover:underline">
-                        {assetPickerOpen ? 'Hide saved assets' : 'Pick from saved assets'}
-                      </button>
-                      {assetPickerOpen && (
-                        <div className="grid grid-cols-3 gap-3 mt-3">
-                          {assets.map((asset) => (
-                            <button key={asset.$id} type="button"
-                              onClick={() => { setBackgroundAssetUrl(asset.url); setAssetPickerOpen(false) }}
-                              className={`rounded-xl overflow-hidden border-2 transition-all ${
-                                backgroundAssetUrl === asset.url ? 'border-indigo-500' : 'border-white/10 hover:border-indigo-500/50'
-                              }`}>
-                              <img src={asset.url} alt={asset.name} className="w-full h-16 object-cover" />
-                            </button>
-                          ))}
-                        </div>
-                      )}
-                    </div>
-                  )}
-                  <input type="text" value={backgroundAssetUrl}
-                    onChange={(e) => setBackgroundAssetUrl(e.target.value)}
-                    placeholder="Or paste asset URL directly"
-                    className="bg-white/5 border border-white/10 rounded-xl px-4 py-2 text-sm text-white placeholder-gray-600 focus:outline-none focus:border-indigo-500 transition-colors" />
-                </div>
-              )}
-            </div>
-
-            {/* Music */}
-            <div className="flex flex-col gap-2">
-              <label className="text-gray-400 text-xs">Background Music URL (optional)</label>
-              <input type="text" value={musicUrl} onChange={(e) => setMusicUrl(e.target.value)}
-                placeholder="https://..."
-                className="bg-white/5 border border-white/10 rounded-xl px-4 py-2 text-sm text-white placeholder-gray-600 focus:outline-none focus:border-indigo-500 transition-colors" />
-            </div>
-          </div>
+          <StyleOptions
+            titleColor={titleColor} setTitleColor={setTitleColor}
+            textColor={textColor} setTextColor={setTextColor}
+            titleSize={titleSize} setTitleSize={setTitleSize}
+            textSize={textSize} setTextSize={setTextSize}
+            titleAlign={titleAlign} setTitleAlign={setTitleAlign}
+            descriptionAlign={descriptionAlign} setDescriptionAlign={setDescriptionAlign}
+            textVertical={textVertical} setTextVertical={setTextVertical}
+            backgroundMode={backgroundMode} setBackgroundMode={setBackgroundMode}
+            backgroundColor={backgroundColor} setBackgroundColor={setBackgroundColor}
+            backgroundAssetType={backgroundAssetType} setBackgroundAssetType={setBackgroundAssetType}
+            backgroundAssetUrl={backgroundAssetUrl} setBackgroundAssetUrl={setBackgroundAssetUrl}
+            musicUrl={musicUrl} setMusicUrl={setMusicUrl}
+            assets={assets}
+            assetLoading={assetLoading}
+            assetPickerOpen={assetPickerOpen} setAssetPickerOpen={setAssetPickerOpen}
+            handleBackgroundUpload={handleBackgroundUpload}
+          />
         )}
 
         {/* Generate */}
@@ -559,99 +435,35 @@ const ProjectDetail = () => {
           ) : project.status === 'completed' ? '🔄 Regenerate Video' : '✨ Generate Video'}
         </button>
 
-        {/* Video player */}
+        {/* Video player + Share */}
         {project.videoUrl && (
-          <div className="bg-white/5 border border-green-500/20 rounded-2xl p-6">
-            <p className="text-gray-400 text-xs uppercase tracking-widest mb-4">Generated Video</p>
-            <video controls className="w-full rounded-xl" src={project.videoUrl} />
-            <div className="flex gap-3 mt-4 flex-wrap">
-              <a href={project.videoUrl} download target="_blank" rel="noreferrer"
-                className="bg-indigo-500 hover:bg-indigo-600 text-white font-bold px-5 py-2.5 rounded-xl text-sm transition-colors">
-                ⬇ Download
-              </a>
-              <button onClick={handleShare} disabled={shareLoading}
-                className="border border-white/10 text-gray-400 hover:text-white px-5 py-2.5 rounded-xl text-sm transition-colors">
-                {shareCopied ? '✅ Link Copied!' : shareLoading ? 'Generating...' : '🔗 Share'}
-              </button>
-            </div>
-            {shareError && <p className="text-red-400 text-sm mt-2">{shareError}</p>}
-
-            <div className="mt-4 pt-4 border-t border-white/10 grid grid-cols-1 sm:grid-cols-3 gap-4">
-              <div className="flex flex-col gap-1">
-                <label className="text-gray-500 text-xs">Expires in</label>
-                <select value={shareExpiryHours} onChange={(e) => setShareExpiryHours(Number(e.target.value))}
-                  className="bg-white/5 border border-white/10 rounded-lg px-3 py-2 text-sm text-white focus:outline-none">
-                  <option value={24}>24 hours</option>
-                  <option value={72}>3 days</option>
-                  <option value={168}>7 days</option>
-                  <option value={720}>30 days</option>
-                </select>
-              </div>
-              <div className="flex flex-col gap-1">
-                <label className="text-gray-500 text-xs">Password (optional)</label>
-                <input type="text" value={sharePassword} onChange={(e) => setSharePassword(e.target.value)}
-                  placeholder="Leave blank for none"
-                  className="bg-white/5 border border-white/10 rounded-lg px-3 py-2 text-sm text-white placeholder-gray-600 focus:outline-none" />
-              </div>
-              <div className="flex items-end pb-1">
-                <label className="flex items-center gap-2 cursor-pointer">
-                  <input type="checkbox" checked={disableDownload} onChange={(e) => setDisableDownload(e.target.checked)}
-                    className="accent-indigo-500" />
-                  <span className="text-gray-400 text-sm">Disable download</span>
-                </label>
-              </div>
-            </div>
-          </div>
+          <SharePanel
+            videoUrl={project.videoUrl}
+            shareLoading={shareLoading}
+            shareCopied={shareCopied}
+            shareError={shareError}
+            shareExpiryHours={shareExpiryHours} setShareExpiryHours={setShareExpiryHours}
+            sharePassword={sharePassword} setSharePassword={setSharePassword}
+            disableDownload={disableDownload} setDisableDownload={setDisableDownload}
+            handleShare={handleShare}
+          />
         )}
 
         {/* Collaborators */}
-        <div className="bg-white/5 border border-white/10 rounded-2xl p-6">
-          <p className="text-gray-400 text-xs uppercase tracking-widest mb-4">Collaborators</p>
-          <p className="text-gray-600 text-xs mb-3">No SMTP configured — invite opens your email client.</p>
-          <div className="flex gap-2 mb-4">
-            <input type="email" value={inviteEmail} onChange={(e) => setInviteEmail(e.target.value)}
-              placeholder="collaborator@email.com"
-              className="flex-1 bg-white/5 border border-white/10 rounded-xl px-4 py-2 text-sm text-white placeholder-gray-600 focus:outline-none focus:border-indigo-500 transition-colors" />
-            <button onClick={addCollaborator}
-              className="bg-indigo-500 hover:bg-indigo-600 text-white font-bold px-4 py-2 rounded-xl text-sm transition-colors">
-              Invite
-            </button>
-          </div>
-          {collaborators.length > 0 && (
-            <div className="flex flex-col gap-2">
-              {collaborators.map((email) => (
-                <div key={email} className="flex items-center gap-2 text-sm text-gray-400">
-                  <span className="w-2 h-2 bg-indigo-500 rounded-full" />
-                  {email}
-                </div>
-              ))}
-            </div>
-          )}
-        </div>
+        <CollaboratorsPanel
+          collaborators={collaborators}
+          inviteEmail={inviteEmail}
+          setInviteEmail={setInviteEmail}
+          addCollaborator={addCollaborator}
+        />
 
         {/* Comments */}
-        <div className="bg-white/5 border border-white/10 rounded-2xl p-6">
-          <p className="text-gray-400 text-xs uppercase tracking-widest mb-4">Comments</p>
-          <div className="flex gap-2 mb-4">
-            <input type="text" value={commentText} onChange={(e) => setCommentText(e.target.value)}
-              placeholder="Add a comment..."
-              className="flex-1 bg-white/5 border border-white/10 rounded-xl px-4 py-2 text-sm text-white placeholder-gray-600 focus:outline-none focus:border-indigo-500 transition-colors" />
-            <button onClick={addProjectComment}
-              className="bg-indigo-500 hover:bg-indigo-600 text-white font-bold px-4 py-2 rounded-xl text-sm transition-colors">
-              Post
-            </button>
-          </div>
-          {comments.length > 0 && (
-            <div className="flex flex-col gap-3">
-              {comments.map((comment) => (
-                <div key={comment.$id || comment.id} className="bg-white/5 border border-white/10 rounded-xl p-4">
-                  <p className="text-white text-sm">{comment.text}</p>
-                  <p className="text-gray-500 text-xs mt-1">{comment.author}</p>
-                </div>
-              ))}
-            </div>
-          )}
-        </div>
+        <CommentsPanel
+          comments={comments}
+          commentText={commentText}
+          setCommentText={setCommentText}
+          addProjectComment={addProjectComment}
+        />
 
         {/* Danger zone */}
         <div className="bg-red-500/5 border border-red-500/20 rounded-2xl p-6">

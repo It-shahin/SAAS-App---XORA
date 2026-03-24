@@ -59,8 +59,19 @@ export const ProjectsProvider = ({ children }) => {
       }
     })
 
-    await fetchProjects()
+    // Optimistic update — prepend new project instead of re-fetching
+    setProjects((prev) => [result, ...prev])
     return result
+  }
+
+  const deleteProject = async (projectId) => {
+    await databases.deleteDocument({
+      databaseId: APPWRITE_DATABASE_ID,
+      collectionId: APPWRITE_PROJECTS_COLLECTION_ID,
+      documentId: projectId
+    })
+    // Optimistic update — remove locally instead of re-fetching
+    setProjects((prev) => prev.filter((p) => p.$id !== projectId))
   }
 
   const incrementUserRenders = async () => {
@@ -91,15 +102,6 @@ export const ProjectsProvider = ({ children }) => {
       plan: 'pro',
       renderLimit: PRO_PLAN_LIMIT
     })
-  }
-
-  const deleteProject = async (projectId) => {
-    await databases.deleteDocument({
-      databaseId: APPWRITE_DATABASE_ID,
-      collectionId: APPWRITE_PROJECTS_COLLECTION_ID,
-      documentId: projectId
-    })
-    await fetchProjects()
   }
 
   useEffect(() => {
