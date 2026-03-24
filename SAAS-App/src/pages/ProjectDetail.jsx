@@ -1,4 +1,4 @@
-import { useEffect, useRef, useMemo, useState } from 'react'
+import { useEffect, useRef, useMemo, useState, useCallback } from 'react'
 import { Link, useNavigate, useParams } from 'react-router-dom'
 import { databases, ID } from '../lib/appwrite'
 import { submitImageRender, submitRender, pollRender } from '../lib/shotstack'
@@ -14,12 +14,29 @@ import CommentsPanel from '../components/project/CommentsPanel'
 
 const QUEUE_STAGES = ['Queued', 'Preparing timeline', 'Rendering', 'Finalizing', 'Completed']
 
+// Default render options — used as fallback when no saved options exist
+const DEFAULT_OPTIONS = {
+  titleColor: '#6366f1',
+  textColor: '#ffffff',
+  titleSize: 58,
+  textSize: 40,
+  titleAlign: 'center',
+  descriptionAlign: 'center',
+  textVertical: 'top',
+  backgroundMode: 'none',
+  backgroundColor: '#0f0f0f',
+  backgroundAssetType: 'image',
+  backgroundAssetUrl: '',
+  musicUrl: '',
+}
+
 const ProjectDetail = () => {
   const { id } = useParams()
   const navigate = useNavigate()
   const { user } = useAuth()
   const { deleteProject, incrementUserRenders, getUserRendersLeft } = useProjects()
   const pollingRef = useRef(null)
+  const saveOptionsTimerRef = useRef(null)
 
   const [project, setProject] = useState(null)
   const [loading, setLoading] = useState(true)
@@ -39,18 +56,19 @@ const ProjectDetail = () => {
   const [inviteEmail, setInviteEmail] = useState('')
   const [commentText, setCommentText] = useState('')
 
-  const [titleColor, setTitleColor] = useState('#6366f1')
-  const [textColor, setTextColor] = useState('#ffffff')
-  const [titleSize, setTitleSize] = useState(58)
-  const [textSize, setTextSize] = useState(40)
-  const [titleAlign, setTitleAlign] = useState('center')
-  const [descriptionAlign, setDescriptionAlign] = useState('center')
-  const [textVertical, setTextVertical] = useState('top')
-  const [backgroundMode, setBackgroundMode] = useState('none')
-  const [backgroundColor, setBackgroundColor] = useState('#0f0f0f')
-  const [backgroundAssetType, setBackgroundAssetType] = useState('image')
-  const [backgroundAssetUrl, setBackgroundAssetUrl] = useState('')
-  const [musicUrl, setMusicUrl] = useState('')
+  // Render style options — initialized from defaults, overwritten from DB on load
+  const [titleColor, setTitleColor] = useState(DEFAULT_OPTIONS.titleColor)
+  const [textColor, setTextColor] = useState(DEFAULT_OPTIONS.textColor)
+  const [titleSize, setTitleSize] = useState(DEFAULT_OPTIONS.titleSize)
+  const [textSize, setTextSize] = useState(DEFAULT_OPTIONS.textSize)
+  const [titleAlign, setTitleAlign] = useState(DEFAULT_OPTIONS.titleAlign)
+  const [descriptionAlign, setDescriptionAlign] = useState(DEFAULT_OPTIONS.descriptionAlign)
+  const [textVertical, setTextVertical] = useState(DEFAULT_OPTIONS.textVertical)
+  const [backgroundMode, setBackgroundMode] = useState(DEFAULT_OPTIONS.backgroundMode)
+  const [backgroundColor, setBackgroundColor] = useState(DEFAULT_OPTIONS.backgroundColor)
+  const [backgroundAssetType, setBackgroundAssetType] = useState(DEFAULT_OPTIONS.backgroundAssetType)
+  const [backgroundAssetUrl, setBackgroundAssetUrl] = useState(DEFAULT_OPTIONS.backgroundAssetUrl)
+  const [musicUrl, setMusicUrl] = useState(DEFAULT_OPTIONS.musicUrl)
 
   const [assets, setAssets] = useState([])
   const [assetLoading, setAssetLoading] = useState(false)
@@ -59,6 +77,36 @@ const ProjectDetail = () => {
   const [collaborators, setCollaborators] = useState([])
   const [comments, setComments] = useState([])
   const [queueStage, setQueueStage] = useState('Queued')
+
+  // Build current options object from state
+  const getCurrentOptions = useCallback(() => ({
+    titleColor, textColor, titleSize, textSize,
+    titleAlign, descriptionAlign, textVertical,
+    backgroundMode, backgroundColor, backgroundAssetType,
+    backgroundAssetUrl, musicUrl,
+  }), [
+    titleColor, textColor, titleSize, textSize,
+    titleAlign, descriptionAlign, textVertical,
+    backgroundMode, backgroundColor, backgroundAssetType,
+    backgroundAssetUrl, musicUrl,
+  ])
+
+  // Apply saved options from DB onto state
+  const applyOptions = (opts) => {
+    if (!opts || typeof opts !== 'object') return
+    if (opts.titleColor)         setTitleColor(opts.titleColor)
+    if (opts.textColor)          setTextColor(opts.textColor)
+    if (opts.titleSize)          setTitleSize(Number(opts.titleSize))
+    if (opts.textSize)           setTextSize(Number(opts.textSize))
+    if (opts.titleAlign)         setTitleAlign(opts.titleAlign)
+    if (opts.descriptionAlign)   setDescriptionAlign(opts.descriptionAlign)
+    if (opts.textVertical)       setTextVertical(opts.textVertical)
+    if (opts.backgroundMode)     setBackgroundMode(opts.backgroundMode)
+    if (opts.backgroundColor)    setBackgroundColor(opts.backgroundColor)
+    if (opts.backgroundAssetType) setBackgroundAssetType(opts.backgroundAssetType)
+    if (opts.backgroundAssetUrl !== undefined) setBackgroundAssetUrl(opts.backgroundAssetUrl)
+    if (opts.musicUrl !== undefined)           setMusicUrl(opts.musicUrl)
+  }
 
   const fetchProject = async () => {
     if (!user) return
@@ -73,6 +121,16 @@ const ProjectDetail = () => {
         return
       }
       setProject(result)
+
+      // Restore user's saved render options from DB if they exist
+      if (result.renderOptions) {
+        try {
+          applyOptions(JSON.parse(result.renderOptions))
+        } catch {
+          // renderOptions field is malformed — keep defaults
+        }
+      }
+
       setScenes(await getScenes(id))
       setCollaborators(await getCollaborators(id))
       setComments(await getComments(id))
@@ -87,10 +145,11 @@ const ProjectDetail = () => {
 
   useEffect(() => { fetchProject() }, [id, user?.$id])
 
-  // Clear polling interval on unmount to prevent memory leaks
+  // Clear polling interval and pending save timer on unmount
   useEffect(() => {
     return () => {
       if (pollingRef.current) clearInterval(pollingRef.current)
+      if (saveOptionsTimerRef.current) clearTimeout(saveOptionsTimerRef.current)
     }
   }, [])
 
@@ -103,6 +162,29 @@ const ProjectDetail = () => {
       setQueueStage('Queued')
     }
   }, [project?.status, project?.videoUrl])
+
+  // Auto-save render options to DB 800ms after user stops changing them
+  useEffect(() => {
+    if (!project) return
+    if (saveOptionsTimerRef.current) clearTimeout(saveOptionsTimerRef.current)
+    saveOptionsTimerRef.current = setTimeout(async () => {
+      try {
+        await databases.updateDocument({
+          databaseId: APPWRITE_DATABASE_ID,
+          collectionId: APPWRITE_PROJECTS_COLLECTION_ID,
+          documentId: id,
+          data: { renderOptions: JSON.stringify(getCurrentOptions()) }
+        })
+      } catch {
+        // Silently fail — options will be re-applied next time via state anyway
+      }
+    }, 800)
+  }, [
+    titleColor, textColor, titleSize, textSize,
+    titleAlign, descriptionAlign, textVertical,
+    backgroundMode, backgroundColor, backgroundAssetType,
+    backgroundAssetUrl, musicUrl,
+  ])
 
   const derivedScenes = useMemo(() => {
     if (scenes.length > 0) return scenes
@@ -165,6 +247,10 @@ const ProjectDetail = () => {
     }
     setGenerating(true)
     setQueueStage('Preparing timeline')
+
+    // Always use the latest options from state — these are what the user configured
+    const renderOptions = getCurrentOptions()
+
     try {
       await databases.updateDocument({
         databaseId: APPWRITE_DATABASE_ID,
@@ -184,12 +270,7 @@ const ProjectDetail = () => {
           project.title,
           timelineText || project.description,
           null,
-          {
-            titleAlign, descriptionAlign, textVertical,
-            backgroundMode, backgroundColor, backgroundAssetType,
-            backgroundAssetUrl, musicUrl, titleColor, textColor,
-            titleSize, textSize,
-          }
+          renderOptions   // ← user's actual chosen options, not defaults
         )
       }
       setQueueStage('Rendering')
