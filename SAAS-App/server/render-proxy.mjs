@@ -65,15 +65,7 @@ const escapeHtml = (value = '') =>
     .replaceAll('"', '&quot;')
     .replaceAll("'", '&#039;')
 
-const buildTimeline = (title, description, style, options = {}) => {
-  const colors = {
-    clean:     { bg: '#0f0f0f', text: '#ffffff', accent: '#6366f1' },
-    bold:      { bg: '#1a0533', text: '#ffffff', accent: '#a855f7' },
-    minimal:   { bg: '#f5f5f5', text: '#111111', accent: '#6366f1' },
-    corporate: { bg: '#0a1628', text: '#ffffff', accent: '#3b82f6' },
-  }
-
-  const palette = colors[style] || colors.clean
+const buildTimeline = (title, description, options = {}) => {
   const sentences = (String(description || '').match(/[^.!?]+[.!?]+/g) || [description]).slice(0, 4)
 
   const titleLength = 4
@@ -86,14 +78,14 @@ const buildTimeline = (title, description, style, options = {}) => {
   const descriptionAlign = options.descriptionAlign  || 'center'
   const vertical         = options.textVertical      || 'top'
   const bgMode           = options.backgroundMode    || 'none'
-  const bgColor          = options.backgroundColor   || palette.bg
+  const bgColor          = options.backgroundColor   || '#0f0f0f'
   const bgAssetType      = options.backgroundAssetType || 'image'
   const bgAssetUrl       = options.backgroundAssetUrl  || ''
   const musicUrl         = options.musicUrl           || ''
-
-  // ← NEW: user can override font colors, fallback to palette
-  const titleColor = options.titleColor || palette.accent
-  const textColor  = options.textColor  || palette.text
+  const titleColor       = options.titleColor         || '#6366f1'
+  const textColor        = options.textColor          || '#ffffff'
+  const titleSize        = Number(options.titleSize)  || 58
+  const textSize         = Number(options.textSize)   || 40
 
   const verticalOffsetMap = { top: -0.32, center: 0, bottom: 0.3 }
   const titleY = verticalOffsetMap[vertical] ?? -0.32
@@ -139,7 +131,7 @@ const buildTimeline = (title, description, style, options = {}) => {
 
   return {
     timeline: {
-      background: bgMode === 'color' ? bgColor : palette.bg,
+      background: bgMode === 'color' ? bgColor : '#0f0f0f',
       tracks: [
         ...preTracks,
         {
@@ -147,11 +139,7 @@ const buildTimeline = (title, description, style, options = {}) => {
             asset: {
               type: 'text',
               text: String(title || ''),
-              font: {
-                family: 'Clear Sans',
-                color: titleColor,  // ← was palette.accent
-                size: 58
-              },
+              font: { family: 'Clear Sans', color: titleColor, size: titleSize },
               alignment: { horizontal: titleAlign },
               width: 900,
               height: 90
@@ -168,11 +156,7 @@ const buildTimeline = (title, description, style, options = {}) => {
             asset: {
               type: 'text',
               text: String(sentence || '').trim(),
-              font: {
-                family: 'Clear Sans',
-                color: textColor,  // ← was palette.text
-                size: 40
-              },
+              font: { family: 'Clear Sans', color: textColor, size: textSize },
               alignment: { horizontal: descriptionAlign },
               width: 1000,
               height: 220
@@ -223,12 +207,11 @@ const server = http.createServer(async (req, res) => {
 
   try {
     if (req.method === 'POST' && url.pathname === '/api/render/text') {
-      const body = await readBody(req)
-      console.log('STYLE:', body.style)         // ← should print 'bold', 'minimal' etc
-      console.log('OPTIONS:', body.options)      // ← should print your options
-      const renderId = await postShotstack(buildTimeline(body.title, body.description, body.style, body.options || {}))
-      return sendJson(res, 200, { renderId })
-    }
+    const body = await readBody(req)
+    const renderId = await postShotstack(buildTimeline(body.title, body.description, body.options || {}))
+    return sendJson(res, 200, { renderId })
+  }
+
 
     if (req.method === 'POST' && url.pathname === '/api/render/image') {
       const body = await readBody(req)
