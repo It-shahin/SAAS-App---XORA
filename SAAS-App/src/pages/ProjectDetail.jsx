@@ -42,17 +42,18 @@ const ProjectDetail = () => {
   const [inviteEmail, setInviteEmail] = useState('')
   const [commentText, setCommentText] = useState('')
 
-  // ← Style state — syncs with project.style on load
-  // ✅ CORRECT — these must be two separate statements
-const [selectedStyle, setSelectedStyle] = useState('clean')
+  const [selectedStyle, setSelectedStyle] = useState('clean')
+  const [titleColor, setTitleColor] = useState('#6366f1')
+  const [textColor, setTextColor] = useState('#ffffff')
 
-useEffect(() => {
+  useEffect(() => {
   if (project?.style) {
     setSelectedStyle(project.style)
     setTitleColor(PALETTES[project.style]?.accent || '#6366f1')
     setTextColor(PALETTES[project.style]?.text || '#ffffff')
   }
 }, [project?.style])
+
 
   const [titleAlign, setTitleAlign] = useState('center')
   const [descriptionAlign, setDescriptionAlign] = useState('center')
@@ -71,8 +72,6 @@ useEffect(() => {
   const [comments, setComments] = useState([])
   const [queueStage, setQueueStage] = useState('Queued')
 
-  const [titleColor, setTitleColor] = useState('#6366f1')
-  const [textColor, setTextColor] = useState('#ffffff')
 
   const fetchProject = async () => {
     if (!user) return
