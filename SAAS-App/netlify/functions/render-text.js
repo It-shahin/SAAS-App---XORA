@@ -10,57 +10,35 @@ exports.handler = async (event) => {
       return { statusCode: 500, body: JSON.stringify({ message: 'Missing SHOTSTACK_API_KEY' }) }
     }
 
-    const MAX_CHARS_PER_SCENE = 72
-    const MAX_CHARS_PER_LINE = 48
-    const MAX_SCENES = 4
-    const splitDescription = (raw = '') => {
-      const clean = String(raw).replace(/\s+/g, ' ').trim()
-      if (!clean) return []
-      const rough = clean
-        .split(/[.!?,;\n]+/)
-        .map((part) => part.trim())
-        .filter(Boolean)
-      const chunks = []
-      rough.forEach((part) => {
-        if (part.length <= MAX_CHARS_PER_SCENE) {
-          chunks.push(part)
-          return
-        }
-        const words = part.split(' ')
-        let current = ''
-        words.forEach((word) => {
-          const next = current ? `${current} ${word}` : word
-          if (next.length > MAX_CHARS_PER_SCENE) {
-            if (current) chunks.push(current)
-            current = word
-          } else {
-            current = next
-          }
-        })
-        if (current) chunks.push(current)
-      })
-      return chunks.slice(0, MAX_SCENES)
-    }
-    const sentences = splitDescription(description)
-    const wrapForDisplay = (text = '', maxChars = MAX_CHARS_PER_LINE) => {
-      const words = String(text).trim().split(/\s+/).filter(Boolean)
+    const MAX_CHARS_PER_LINE = 40
+    const MAX_LINES_PER_BLOCK = 2
+    const MAX_BLOCKS = 6
+    const splitToBlocks = (raw = '') => {
+      const words = String(raw).replace(/\s+/g, ' ').trim().split(' ').filter(Boolean)
+      if (words.length === 0) return []
       const lines = []
       let current = ''
-      words.forEach((word) => {
+      for (const word of words) {
         const next = current ? `${current} ${word}` : word
-        if (next.length > maxChars) {
+        if (next.length > MAX_CHARS_PER_LINE) {
           if (current) lines.push(current)
           current = word
         } else {
           current = next
         }
-      })
+      }
       if (current) lines.push(current)
-      return lines.join('<br/>')
+      const blocks = []
+      for (let i = 0; i < lines.length; i += MAX_LINES_PER_BLOCK) {
+        blocks.push({ lines: lines.slice(i, i + MAX_LINES_PER_BLOCK) })
+        if (blocks.length >= MAX_BLOCKS) break
+      }
+      return blocks
     }
+    const blocks = splitToBlocks(description)
     const titleLength = 4
     const sceneGap = 0.6
-    const sceneLength = 4.2
+    const sceneLength = 3
     const sceneStep = sceneLength + sceneGap
     const firstSceneStart = titleLength + sceneGap
 
@@ -143,10 +121,10 @@ exports.handler = async (event) => {
             ]
           },
           {
-            clips: sentences.map((s, i) => ({
+            clips: blocks.map((block, i) => ({
               asset: {
                 type: 'html',
-                html: `<p>${wrapForDisplay(escapeHtml(String(s || '').trim()))}</p>`,
+                html: `<p>${block.lines.map((line) => escapeHtml(line)).join('<br/>')}</p>`,
                 css: `p { font-family: 'Open Sans', Arial, sans-serif; font-size: ${textSize}px; font-weight: 600; color: ${textColor}; text-align: ${descriptionAlign}; line-height: 1.35; margin: 0; white-space: normal; overflow-wrap: anywhere; word-break: break-word; }`,
                 width: 1150,
                 height: 260
