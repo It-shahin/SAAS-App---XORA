@@ -66,7 +66,37 @@ const escapeHtml = (value = '') =>
     .replaceAll("'", '&#039;')
 
 const buildTimeline = (title, description, options = {}) => {
-  const sentences = (String(description || '').match(/[^.!?]+[.!?]+/g) || [description]).slice(0, 4)
+  const MAX_CHARS_PER_SCENE = 85
+  const MAX_SCENES = 4
+  const splitDescription = (raw = '') => {
+    const clean = String(raw).replace(/\s+/g, ' ').trim()
+    if (!clean) return []
+    const rough = clean
+      .split(/[.!?,;\n]+/)
+      .map((part) => part.trim())
+      .filter(Boolean)
+    const chunks = []
+    rough.forEach((part) => {
+      if (part.length <= MAX_CHARS_PER_SCENE) {
+        chunks.push(part)
+        return
+      }
+      const words = part.split(' ')
+      let current = ''
+      words.forEach((word) => {
+        const next = current ? `${current} ${word}` : word
+        if (next.length > MAX_CHARS_PER_SCENE) {
+          if (current) chunks.push(current)
+          current = word
+        } else {
+          current = next
+        }
+      })
+      if (current) chunks.push(current)
+    })
+    return chunks.slice(0, MAX_SCENES)
+  }
+  const sentences = splitDescription(description)
 
   const titleLength = 4
   const sceneGap = 0.6
@@ -135,7 +165,7 @@ const buildTimeline = (title, description, options = {}) => {
             asset: {
               type: 'html',
               html: `<p>${escapeHtml(String(title || ''))}</p>`,
-              css: `p { font-family: 'Open Sans', Arial, sans-serif; font-size: ${titleSize}px; font-weight: 800; color: ${titleColor}; text-align: ${titleAlign}; line-height: 1.2; margin: 0; }`,
+              css: `p { font-family: 'Open Sans', Arial, sans-serif; font-size: ${titleSize}px; font-weight: 800; color: ${titleColor}; text-align: ${titleAlign}; line-height: 1.2; margin: 0; white-space: normal; overflow-wrap: anywhere; word-break: break-word; }`,
               width: 1150,
               height: 120
             },
@@ -151,7 +181,7 @@ const buildTimeline = (title, description, options = {}) => {
             asset: {
               type: 'html',
               html: `<p>${escapeHtml(String(sentence || '').trim())}</p>`,
-              css: `p { font-family: 'Open Sans', Arial, sans-serif; font-size: ${textSize}px; font-weight: 600; color: ${textColor}; text-align: ${descriptionAlign}; line-height: 1.35; margin: 0; }`,
+              css: `p { font-family: 'Open Sans', Arial, sans-serif; font-size: ${textSize}px; font-weight: 600; color: ${textColor}; text-align: ${descriptionAlign}; line-height: 1.35; margin: 0; white-space: normal; overflow-wrap: anywhere; word-break: break-word; }`,
               width: 1150,
               height: 260
             },

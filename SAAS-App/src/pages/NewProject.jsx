@@ -21,6 +21,7 @@ const NewProject = () => {
   const [savedAssets, setSavedAssets] = useState([])
 
   const MAX_IMAGE_SIZE_BYTES = 10 * 1024 * 1024
+  const MAX_DESCRIPTION_CHARS = 340
   const ALLOWED_TYPES = ['image/jpeg', 'image/png', 'image/webp']
 
   useEffect(() => {
@@ -63,6 +64,9 @@ const NewProject = () => {
     setError('')
     if (!formData.title.trim()) return setError('Project title is required.')
     if (mode === 'text' && !formData.description.trim()) return setError('Please add a script/description.')
+    if (mode === 'text' && formData.description.trim().length > MAX_DESCRIPTION_CHARS) {
+      return setError(`Description is too long. Please keep it under ${MAX_DESCRIPTION_CHARS} characters.`)
+    }
     if (mode === 'image' && !imageFile && !formData.imageUrl) return setError('Please upload or select an image.')
     setLoading(true)
     try {
@@ -140,9 +144,10 @@ const NewProject = () => {
                 placeholder="Write your video script here. Each sentence becomes a scene."
                 value={formData.description}
                 onChange={(e) => setFormData((prev) => ({ ...prev, description: e.target.value }))}
+                maxLength={MAX_DESCRIPTION_CHARS}
                 className="bg-white/5 border border-white/10 rounded-xl px-4 py-3 text-white placeholder-gray-600 focus:outline-none focus:border-indigo-500 transition-colors resize-none"
               />
-              <p className="text-gray-600 text-xs">Each sentence becomes a scene. Up to 4 scenes will be rendered.</p>
+              <p className="text-gray-600 text-xs">Each sentence/comma chunk becomes a scene. Up to 4 scenes. {formData.description.length}/{MAX_DESCRIPTION_CHARS}</p>
             </div>
           )}
 
