@@ -34,7 +34,7 @@ const Features = () => {
                                 <p className="mb-11 body-1 max-md:mb-8 max-md:body-3">
                                     {text}
                                 </p>
-                                <Button icon={button.icon}>{button.title}</Button>
+                                <Button icon={button.icon} href={button.url}>{button.title}</Button>
                             </div>
                         ))}
 

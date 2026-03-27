@@ -10,6 +10,7 @@ export const features = [
     button: {
       icon: "/images/magictouch.svg",
       title: "Watch the demo",
+      url: "/signup"
     },
   },
   {
@@ -21,6 +22,7 @@ export const features = [
     button: {
       icon: "/images/docs.svg",
       title: "Read the docs",
+      url: "/docs"
     },
   },
 ];
@@ -255,25 +257,25 @@ export const links = [
     id: "0",
     title: "Ios",
     icon: <Ios />,
-    url: "#",
+    url: "/docs",
   },
   {
     id: "1",
     title: "Android",
     icon: <Android />,
-    url: "#",
+    url: "/docs",
   },
   {
     id: "2",
     title: "Windows",
     icon: <Windows />,
-    url: "#",
+    url: "/docs",
   },
   {
     id: "3",
     title: "Web",
     icon: <Web />,
-    url: "#",
+    url: "/signup",
   },
 ];
 

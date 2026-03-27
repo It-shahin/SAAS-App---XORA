@@ -1,4 +1,5 @@
 import { socials } from "../constants"
+import { Link } from "react-router-dom"
 
 const Footer = () => {
   return (
@@ -11,10 +12,10 @@ const Footer = () => {
                     </p>
                 </div>
                     <div className="flex items-center justify-center sm:ml-auto">
-                        <p className="legal-after relative mr-9 text-p5 transition-all
-                        duration-500 hover:text-p1">Privacy policy</p>
-                        <p className="text-p5 transition-all
-                        duration-500 hover:text-p1">Terms of Use</p>
+                        <Link to="/privacy" className="legal-after relative mr-9 text-p5 transition-all
+                        duration-500 hover:text-p1">Privacy policy</Link>
+                        <Link to="/terms" className="text-p5 transition-all
+                        duration-500 hover:text-p1">Terms of Use</Link>
                     </div>
 
                 <ul className="flex flex-1 justify-center gap-3 max-md:mt-10 md:justify-end">

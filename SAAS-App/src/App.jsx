@@ -14,6 +14,9 @@ import ShareView from './pages/ShareView'
 import Billing from './pages/Billing'
 import Assets from './pages/Assets'
 import NotFound from './pages/NotFound'
+import Docs from './pages/Docs'
+import Privacy from './pages/Privacy'
+import Terms from './pages/Terms'
 
 const App = () => (
   <Routes>
@@ -44,6 +47,9 @@ const App = () => (
     <Route path="/assets" element={
       <ProtectedRoute><Assets /></ProtectedRoute>
     } />
+    <Route path="/docs" element={<Docs />} />
+    <Route path="/privacy" element={<Privacy />} />
+    <Route path="/terms" element={<Terms />} />
     <Route path="*" element={<NotFound />} />
   </Routes>
 )
