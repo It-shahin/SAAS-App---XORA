@@ -4,47 +4,91 @@ exports.handler = async (event) => {
   }
 
   try {
-    const { title, description, style } = JSON.parse(event.body || '{}')
+    const { title, description, options = {} } = JSON.parse(event.body || '{}')
     const apiKey = process.env.SHOTSTACK_API_KEY
     if (!apiKey) {
       return { statusCode: 500, body: JSON.stringify({ message: 'Missing SHOTSTACK_API_KEY' }) }
     }
 
-    const colors = {
-      clean: { bg: '#0f0f0f', text: '#ffffff', accent: '#6366f1' },
-      bold: { bg: '#1a0533', text: '#ffffff', accent: '#a855f7' },
-      minimal: { bg: '#f5f5f5', text: '#111111', accent: '#6366f1' },
-      corporate: { bg: '#0a1628', text: '#ffffff', accent: '#3b82f6' }
-    }
-    const palette = colors[style] || colors.clean
-
-    const escapeHtml = (v = '') =>
-      String(v)
-        .replaceAll('&', '&amp;')
-        .replaceAll('<', '&lt;')
-        .replaceAll('>', '&gt;')
-        .replaceAll('"', '&quot;')
-        .replaceAll("'", '&#039;')
-
     const sentences = (String(description || '').match(/[^.!?]+[.!?]+/g) || [description]).slice(0, 4)
+    const titleLength = 4
+    const sceneGap = 0.6
+    const sceneLength = 4.2
+    const sceneStep = sceneLength + sceneGap
+    const firstSceneStart = titleLength + sceneGap
+
+    const titleAlign = options.titleAlign || 'center'
+    const descriptionAlign = options.descriptionAlign || 'center'
+    const vertical = options.textVertical || 'top'
+    const bgMode = options.backgroundMode || 'none'
+    const bgColor = options.backgroundColor || '#0f0f0f'
+    const bgAssetType = options.backgroundAssetType || 'image'
+    const bgAssetUrl = options.backgroundAssetUrl || ''
+    const musicUrl = options.musicUrl || ''
+    const titleColor = options.titleColor || '#6366f1'
+    const textColor = options.textColor || '#ffffff'
+    const titleSize = Number(options.titleSize) || 58
+    const textSize = Number(options.textSize) || 40
+
+    const verticalOffsetMap = { top: -0.32, center: 0, bottom: 0.3 }
+    const titleY = verticalOffsetMap[vertical] ?? -0.32
+    const descriptionY = Math.min(titleY + 0.3, 0.55)
+
+    const alignOffsetMap = { left: -0.28, center: 0, right: 0.28 }
+    const titleX = alignOffsetMap[titleAlign] ?? 0
+    const descriptionX = alignOffsetMap[descriptionAlign] ?? 0
+
+    const preTracks = []
+    if (bgMode === 'asset' && bgAssetType === 'video' && bgAssetUrl) {
+      preTracks.push({
+        clips: [{
+          asset: { type: 'video', src: bgAssetUrl, volume: 0 },
+          start: 0,
+          length: 'auto',
+          transition: { in: 'fade', out: 'fade' }
+        }]
+      })
+    }
+    if (bgMode === 'asset' && bgAssetType !== 'video' && bgAssetUrl) {
+      preTracks.push({
+        clips: [{
+          asset: { type: 'image', src: bgAssetUrl },
+          start: 0,
+          length: 'end',
+          transition: { in: 'fade', out: 'fade' }
+        }]
+      })
+    }
+    if (musicUrl) {
+      preTracks.push({
+        clips: [{
+          asset: { type: 'audio', src: musicUrl, effect: 'fadeOut', volume: 1 },
+          start: 0,
+          length: 'end'
+        }]
+      })
+    }
 
     const payload = {
       timeline: {
-        background: palette.bg,
+        background: bgMode === 'color' ? bgColor : '#0f0f0f',
         tracks: [
+          ...preTracks,
           {
             clips: [
               {
                 asset: {
-                  type: 'html',
-                  html: `<p>${escapeHtml(title)}</p>`,
-                  css: `p { font-family: 'Open Sans'; font-size: 64px; font-weight: 800; color: ${palette.accent}; text-align: center; }`,
-                  width: 1100,
-                  height: 200
+                  type: 'text',
+                  text: String(title || ''),
+                  font: { family: 'Clear Sans', color: titleColor, size: titleSize },
+                  alignment: { horizontal: titleAlign },
+                  width: 900,
+                  height: 90
                 },
                 start: 0,
-                length: 4,
+                length: titleLength,
                 position: 'center',
+                offset: { x: titleX, y: titleY },
                 transition: { in: 'fade', out: 'fade' }
               }
             ]
@@ -52,15 +96,17 @@ exports.handler = async (event) => {
           {
             clips: sentences.map((s, i) => ({
               asset: {
-                type: 'html',
-                html: `<p>${escapeHtml(String(s || '').trim())}</p>`,
-                css: `p { font-family: 'Open Sans'; font-size: 40px; color: ${palette.text}; text-align: center; line-height: 1.4; }`,
+                type: 'text',
+                text: String(s || '').trim(),
+                font: { family: 'Clear Sans', color: textColor, size: textSize },
+                alignment: { horizontal: descriptionAlign },
                 width: 1000,
-                height: 300
+                height: 220
               },
-              start: i * 4.8,
-              length: 4.2,
+              start: firstSceneStart + i * sceneStep,
+              length: sceneLength,
               position: 'center',
+              offset: { x: descriptionX, y: descriptionY },
               transition: { in: 'fade', out: 'fade' }
             }))
           }
