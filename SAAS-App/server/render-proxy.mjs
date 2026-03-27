@@ -66,7 +66,8 @@ const escapeHtml = (value = '') =>
     .replaceAll("'", '&#039;')
 
 const buildTimeline = (title, description, options = {}) => {
-  const MAX_CHARS_PER_SCENE = 85
+  const MAX_CHARS_PER_SCENE = 72
+  const MAX_CHARS_PER_LINE = 52
   const MAX_SCENES = 4
   const splitDescription = (raw = '') => {
     const clean = String(raw).replace(/\s+/g, ' ').trim()
@@ -97,6 +98,22 @@ const buildTimeline = (title, description, options = {}) => {
     return chunks.slice(0, MAX_SCENES)
   }
   const sentences = splitDescription(description)
+  const wrapForDisplay = (text = '', maxChars = MAX_CHARS_PER_LINE) => {
+    const words = String(text).trim().split(/\s+/).filter(Boolean)
+    const lines = []
+    let current = ''
+    words.forEach((word) => {
+      const next = current ? `${current} ${word}` : word
+      if (next.length > maxChars) {
+        if (current) lines.push(current)
+        current = word
+      } else {
+        current = next
+      }
+    })
+    if (current) lines.push(current)
+    return lines.join('<br/>')
+  }
 
   const titleLength = 4
   const sceneGap = 0.6
@@ -180,7 +197,7 @@ const buildTimeline = (title, description, options = {}) => {
           clips: sentences.map((sentence, i) => ({
             asset: {
               type: 'html',
-              html: `<p>${escapeHtml(String(sentence || '').trim())}</p>`,
+              html: `<p>${wrapForDisplay(escapeHtml(String(sentence || '').trim()))}</p>`,
               css: `p { font-family: 'Open Sans', Arial, sans-serif; font-size: ${textSize}px; font-weight: 600; color: ${textColor}; text-align: ${descriptionAlign}; line-height: 1.35; margin: 0; white-space: normal; overflow-wrap: anywhere; word-break: break-word; }`,
               width: 1150,
               height: 260
