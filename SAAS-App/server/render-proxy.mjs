@@ -66,60 +66,52 @@ const escapeHtml = (value = '') =>
     .replaceAll("'", '&#039;')
 
 const buildTimeline = (title, description, options = {}) => {
-  const MAX_CHARS_PER_SCENE = 72
   const MAX_CHARS_PER_LINE = 52
-  const MAX_SCENES = 4
+  const MAX_SCREENS = 6
+  const SCREEN_DURATION = 4.2
+  const SCREEN_GAP = 0.6
+
   const splitDescription = (raw = '') => {
     const clean = String(raw).replace(/\s+/g, ' ').trim()
     if (!clean) return []
-    const rough = clean
-      .split(/[.!?,;\n]+/)
+    return clean
+      .split(/[.!?;\n]+/)
       .map((part) => part.trim())
       .filter(Boolean)
-    const chunks = []
-    rough.forEach((part) => {
-      if (part.length <= MAX_CHARS_PER_SCENE) {
-        chunks.push(part)
-        return
-      }
-      const words = part.split(' ')
-      let current = ''
-      words.forEach((word) => {
-        const next = current ? `${current} ${word}` : word
-        if (next.length > MAX_CHARS_PER_SCENE) {
-          if (current) chunks.push(current)
-          current = word
-        } else {
-          current = next
-        }
-      })
-      if (current) chunks.push(current)
-    })
-    return chunks.slice(0, MAX_SCENES)
   }
-  const sentences = splitDescription(description)
-  const wrapForDisplay = (text = '', maxChars = MAX_CHARS_PER_LINE) => {
-    const words = String(text).trim().split(/\s+/).filter(Boolean)
-    const lines = []
-    let current = ''
-    words.forEach((word) => {
-      const next = current ? `${current} ${word}` : word
-      if (next.length > maxChars) {
-        if (current) lines.push(current)
-        current = word
-      } else {
-        current = next
+
+  const splitBalancedLine = (text = '', maxChars = MAX_CHARS_PER_LINE) => {
+    const clean = String(text).trim()
+    if (clean.length <= maxChars) return [clean]
+    const words = clean.split(/\s+/)
+    if (words.length <= 3) return [clean]
+    const totalLen = clean.length
+    const mid = totalLen / 2
+    let bestIdx = 1
+    let bestScore = Number.POSITIVE_INFINITY
+    for (let i = 2; i < words.length - 1; i += 1) {
+      const left = words.slice(0, i).join(' ')
+      const right = words.slice(i).join(' ')
+      const score = Math.abs(left.length - mid) + Math.abs(left.length - right.length) * 0.5
+      if (left.length >= 18 && right.length >= 18 && score < bestScore) {
+        bestScore = score
+        bestIdx = i
       }
-    })
-    if (current) lines.push(current)
-    return lines.join('<br/>')
+    }
+    const line1 = words.slice(0, bestIdx).join(' ')
+    const line2 = words.slice(bestIdx).join(' ')
+    return [line1, line2]
+  }
+  const phrases = splitDescription(description)
+  const lines = phrases.flatMap((phrase) => splitBalancedLine(phrase)).filter(Boolean)
+  const screens = []
+  for (let i = 0; i < lines.length; i += 2) {
+    screens.push(lines.slice(i, i + 2))
+    if (screens.length >= MAX_SCREENS) break
   }
 
   const titleLength = 4
-  const sceneGap = 0.6
-  const sceneLength = 4.2
-  const sceneStep = sceneLength + sceneGap
-  const firstSceneStart = titleLength + sceneGap
+  const firstSceneStart = titleLength + SCREEN_GAP
 
   const titleAlign       = options.titleAlign        || 'center'
   const descriptionAlign = options.descriptionAlign  || 'center'
@@ -194,16 +186,18 @@ const buildTimeline = (title, description, options = {}) => {
           }]
         },
         {
-          clips: sentences.map((sentence, i) => ({
+          clips: screens.map((screen, i) => ({
             asset: {
               type: 'html',
-              html: `<p>${wrapForDisplay(escapeHtml(String(sentence || '').trim()))}</p>`,
-              css: `p { font-family: 'Open Sans', Arial, sans-serif; font-size: ${textSize}px; font-weight: 600; color: ${textColor}; text-align: ${descriptionAlign}; line-height: 1.35; margin: 0; white-space: normal; overflow-wrap: anywhere; word-break: break-word; }`,
+              html: screen
+                .map((line) => `<p>${escapeHtml(String(line || '').trim())}</p>`)
+                .join(''),
+              css: `p { font-family: 'Open Sans', Arial, sans-serif; font-size: ${Math.max(26, Math.round(textSize * (screen.length > 2 ? 0.9 : 1)))}px; font-weight: 600; color: ${textColor}; text-align: ${descriptionAlign}; line-height: 1.35; margin: 0 0 12px 0; white-space: normal; overflow-wrap: anywhere; word-break: break-word; } p:last-child { margin-bottom: 0; }`,
               width: 1150,
-              height: 260
+              height: 320
             },
-            start: firstSceneStart + i * sceneStep,
-            length: sceneLength,
+            start: firstSceneStart + i * (SCREEN_DURATION + SCREEN_GAP),
+            length: SCREEN_DURATION,
             position: 'center',
             offset: { x: 0, y: descriptionY },
             transition: { in: 'fade', out: 'fade' }
