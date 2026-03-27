@@ -92,7 +92,7 @@ const ProjectDetail = () => {
   ])
 
   // Apply saved options from DB onto state
-  const applyOptions = (opts) => {
+  const applyOptions = useCallback((opts) => {
     if (!opts || typeof opts !== 'object') return
     if (opts.titleColor)         setTitleColor(opts.titleColor)
     if (opts.textColor)          setTextColor(opts.textColor)
@@ -106,9 +106,9 @@ const ProjectDetail = () => {
     if (opts.backgroundAssetType) setBackgroundAssetType(opts.backgroundAssetType)
     if (opts.backgroundAssetUrl !== undefined) setBackgroundAssetUrl(opts.backgroundAssetUrl)
     if (opts.musicUrl !== undefined)           setMusicUrl(opts.musicUrl)
-  }
+  }, [])
 
-  const fetchProject = async () => {
+  const fetchProject = useCallback(async () => {
     if (!user) return
     try {
       const result = await databases.getDocument({
@@ -141,9 +141,9 @@ const ProjectDetail = () => {
     } finally {
       setLoading(false)
     }
-  }
+  }, [id, user, applyOptions])
 
-  useEffect(() => { fetchProject() }, [id, user?.$id])
+  useEffect(() => { fetchProject() }, [fetchProject])
 
   // Clear polling interval and pending save timer on unmount
   useEffect(() => {
@@ -179,7 +179,13 @@ const ProjectDetail = () => {
         // Silently fail — options will be re-applied next time via state anyway
       }
     }, 800)
+    return () => {
+      if (saveOptionsTimerRef.current) clearTimeout(saveOptionsTimerRef.current)
+    }
   }, [
+    getCurrentOptions,
+    id,
+    project,
     titleColor, textColor, titleSize, textSize,
     titleAlign, descriptionAlign, textVertical,
     backgroundMode, backgroundColor, backgroundAssetType,
@@ -269,7 +275,6 @@ const ProjectDetail = () => {
         renderId = await submitRender(
           project.title,
           timelineText || project.description,
-          null,
           renderOptions   // ← user's actual chosen options, not defaults
         )
       }
@@ -326,6 +331,11 @@ const ProjectDetail = () => {
         title: project.title,
         videoUrl: project.videoUrl,
         metadata: JSON.stringify({
+          access: {
+            exp: Date.now() + shareExpiryHours * 3600 * 1000,
+            nodl: disableDownload,
+            phash: sharePassword.trim() ? await hashPassword(sharePassword.trim()) : ''
+          },
           scenes: derivedScenes,
           comments: comments.map((c) => ({ id: c.$id || c.id, text: c.text, author: c.author }))
         })
@@ -345,11 +355,7 @@ const ProjectDetail = () => {
           data: payload
         })
       }
-      const params = new URLSearchParams()
-      params.set('exp', String(Date.now() + shareExpiryHours * 3600 * 1000))
-      if (disableDownload) params.set('nodl', '1')
-      if (sharePassword.trim()) params.set('phash', await hashPassword(sharePassword.trim()))
-      const shareUrl = `${window.location.origin}/share/${id}?${params.toString()}`
+      const shareUrl = `${window.location.origin}/share/${id}`
       await copyToClipboard(shareUrl)
       setShareCopied(true)
       setTimeout(() => setShareCopied(false), 3000)
@@ -417,7 +423,7 @@ const ProjectDetail = () => {
 
       <header className="border-b border-white/10 px-6 py-4 flex items-center justify-between sticky top-0 z-10 backdrop-blur-sm bg-gray-900/80">
         <Link to="/dashboard">
-          <img src="/images/xora.svg" width={120} height={48} alt="Xora" />
+          <img src="/images/xora.svg" width={120} height={48} alt="Trimix AI" />
         </Link>
         <Link to="/dashboard" className="text-gray-400 text-sm hover:text-white transition-colors">
           ← Dashboard

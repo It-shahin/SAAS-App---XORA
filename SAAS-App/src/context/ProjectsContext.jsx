@@ -1,5 +1,5 @@
 /* eslint-disable react-refresh/only-export-components */
-import { createContext, useContext, useEffect, useState } from 'react'
+import { createContext, useContext, useEffect, useState, useCallback } from 'react'
 import { ID, Query } from 'appwrite'
 import { account, databases } from '../lib/appwrite'
 import { useAuth } from './AuthContext'
@@ -15,7 +15,7 @@ export const ProjectsProvider = ({ children }) => {
   const [projects, setProjects] = useState([])
   const [loading, setLoading] = useState(true)
 
-  const fetchProjects = async () => {
+  const fetchProjects = useCallback(async () => {
     if (!user) {
       setProjects([])
       setLoading(false)
@@ -36,7 +36,7 @@ export const ProjectsProvider = ({ children }) => {
     } finally {
       setLoading(false)
     }
-  }
+  }, [user])
 
   const createProject = async (projectData) => {
     if (!user) {
@@ -50,7 +50,6 @@ export const ProjectsProvider = ({ children }) => {
       data: {
         title: projectData.title.trim(),
         description: (projectData.description || '').trim(),
-        style: projectData.style,
         status: 'draft',
         userID: user.$id,
         mode: projectData.mode || 'text',
@@ -106,7 +105,7 @@ export const ProjectsProvider = ({ children }) => {
 
   useEffect(() => {
     fetchProjects()
-  }, [user])
+  }, [fetchProjects])
 
   return (
     <ProjectsContext.Provider

@@ -88,7 +88,7 @@ const NewProject = () => {
     <div className="min-h-screen bg-gray-900 text-white">
       <header className="border-b border-white/10 px-6 py-4 flex items-center justify-between sticky top-0 z-10 backdrop-blur-sm bg-gray-900/80">
         <Link to="/dashboard">
-          <img src="/images/xora.svg" width={120} height={48} alt="Xora" />
+          <img src="/images/xora.svg" width={120} height={48} alt="Trimix AI" />
         </Link>
         <Link to="/dashboard" className="text-gray-400 text-sm hover:text-white transition-colors">
           ← Back to Dashboard
@@ -97,7 +97,7 @@ const NewProject = () => {
 
       <div className="max-w-2xl mx-auto px-6 py-12">
         <h1 className="text-3xl font-bold mb-2">New Project</h1>
-        <p className="text-gray-400 mb-10">Set your title and script, then customize colors and style inside the project.</p>
+        <p className="text-gray-400 mb-10">Set your title and script, then customize colors and alignment inside the project.</p>
 
         <form onSubmit={handleSubmit} className="flex flex-col gap-8">
 

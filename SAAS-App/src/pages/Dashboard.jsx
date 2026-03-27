@@ -13,12 +13,15 @@ const Dashboard = () => {
   const [plan, setPlan] = useState('free')
 
   useEffect(() => {
+    let active = true
     getPlanInfo().then((info) => {
+      if (!active) return
       setRendersUsed(info.rendersUsed)
       setRenderLimit(info.renderLimit)
       setPlan(info.plan)
     })
-  }, [projects])
+    return () => { active = false }
+  }, [getPlanInfo, projects.length])
 
   const totalRendersUsed = projects.reduce((sum, p) => sum + (p.rendersUsed || 0), 0)
   const totalRendersLeft = Math.max(0, renderLimit - rendersUsed)

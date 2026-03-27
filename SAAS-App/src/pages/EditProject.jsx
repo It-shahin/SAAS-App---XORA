@@ -11,20 +11,12 @@ const EditProject = () => {
   const { user } = useAuth()
   const [formData, setFormData] = useState({
     title: '',
-    description: '',
-    style: 'clean'
+    description: ''
   })
   const [loading, setLoading] = useState(true)
   const [saving, setSaving] = useState(false)
   const [error, setError] = useState('')
   const [scenes, setScenes] = useState([])
-
-  const styles = [
-    { value: 'clean', label: 'Clean & Modern' },
-    { value: 'bold', label: 'Bold & Dynamic' },
-    { value: 'minimal', label: 'Minimal' },
-    { value: 'corporate', label: 'Corporate' }
-  ]
 
   // Load existing project data
   useEffect(() => {
@@ -43,8 +35,7 @@ const EditProject = () => {
 
         setFormData({
           title: result.title,
-          description: result.description,
-          style: result.style || 'clean'
+          description: result.description
         })
 
         const savedScenes = await getScenes(id)
@@ -81,8 +72,7 @@ const EditProject = () => {
           description: (scenes.length > 0
             ? scenes.map((scene) => scene.text.trim()).filter(Boolean).join('. ')
             : formData.description
-          ).trim(),
-          style: formData.style
+          ).trim()
         }
       })
       await saveScenes(id, scenes)
@@ -209,38 +199,6 @@ const EditProject = () => {
                     </button>
                   </div>
                 </div>
-              ))}
-            </div>
-          </div>
-
-          <div>
-            <label className="block text-sm font-medium text-gray-100 mb-4">
-              Video Style
-            </label>
-            <div className="grid grid-cols-2 gap-3">
-              {styles.map((style) => (
-                <label
-                  key={style.value}
-                  className={`flex items-center gap-3 p-3 rounded-xl border cursor-pointer transition-all ${
-                    formData.style === style.value
-                      ? 'border-indigo-500 bg-indigo-500/10'
-                      : 'border-white/10 hover:border-white/20 hover:bg-white/5'
-                  }`}
-                >
-                  <input
-                    type="radio"
-                    name="style"
-                    value={style.value}
-                    checked={formData.style === style.value}
-                    onChange={(e) => setFormData({ ...formData, style: e.target.value })}
-                    className="sr-only"
-                  />
-                  <span className={`text-sm font-semibold ${
-                    formData.style === style.value ? 'text-indigo-400' : 'text-gray-400'
-                  }`}>
-                    {style.label}
-                  </span>
-                </label>
               ))}
             </div>
           </div>

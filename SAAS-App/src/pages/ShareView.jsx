@@ -12,11 +12,12 @@ const ShareView = () => {
   const [passwordInput, setPasswordInput] = useState('')
   const [authorized, setAuthorized] = useState(false)
   const [sharedMeta, setSharedMeta] = useState({ comments: [], scenes: [] })
+  const [access, setAccess] = useState({ exp: 0, nodl: false, phash: '' })
 
   const params = useMemo(() => new URLSearchParams(location.search), [location.search])
-  const exp = Number(params.get('exp') || 0)
-  const noDownload = params.get('nodl') === '1'
-  const passwordHash = params.get('phash') || ''
+  const legacyExp = Number(params.get('exp') || 0)
+  const legacyNoDownload = params.get('nodl') === '1'
+  const legacyPasswordHash = params.get('phash') || ''
 
   const hashPassword = async (text) => {
     const enc = new TextEncoder().encode(text)
@@ -28,12 +29,6 @@ const ShareView = () => {
 
   useEffect(() => {
     const fetchShare = async () => {
-      if (exp && Date.now() > exp) {
-        setError('This shared link has expired.')
-        setLoading(false)
-        return
-      }
-
       try {
         const result = await databases.getDocument({
           databaseId: APPWRITE_DATABASE_ID,
@@ -42,11 +37,31 @@ const ShareView = () => {
         })
         setShare(result)
         try {
-          setSharedMeta(JSON.parse(result.metadata || '{}'))
+          const parsed = JSON.parse(result.metadata || '{}')
+          setSharedMeta(parsed)
+          const accessFromDoc = parsed?.access || {}
+          const nextAccess = {
+            exp: Number(accessFromDoc.exp || legacyExp || 0),
+            nodl: Boolean(accessFromDoc.nodl || legacyNoDownload),
+            phash: accessFromDoc.phash || legacyPasswordHash || ''
+          }
+          setAccess(nextAccess)
+
+          if (nextAccess.exp && Date.now() > nextAccess.exp) {
+            setError('This shared link has expired.')
+            return
+          }
+
+          setAuthorized(!nextAccess.phash)
         } catch {
           setSharedMeta({ comments: [], scenes: [] })
+          setAccess({ exp: legacyExp, nodl: legacyNoDownload, phash: legacyPasswordHash })
+          if (legacyExp && Date.now() > legacyExp) {
+            setError('This shared link has expired.')
+            return
+          }
+          setAuthorized(!legacyPasswordHash)
         }
-        setAuthorized(!passwordHash)
       } catch {
         setError('This video is not available or the link has expired.')
       } finally {
@@ -54,11 +69,11 @@ const ShareView = () => {
       }
     }
     fetchShare()
-  }, [projectId, exp, passwordHash])
+  }, [projectId, legacyExp, legacyNoDownload, legacyPasswordHash])
 
   const unlock = async () => {
     const entered = await hashPassword(passwordInput.trim())
-    if (entered === passwordHash) {
+    if (entered === access.phash) {
       setAuthorized(true)
       setError('')
     } else {
@@ -151,7 +166,7 @@ const ShareView = () => {
                 </div>
               )}
               <div className="flex gap-4 mt-6">
-                {!noDownload && (
+                {!access.nodl && (
                   <a
                     href={share?.videoUrl}
                     download

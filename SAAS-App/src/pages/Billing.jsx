@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react'
+import { useEffect, useState, useCallback } from 'react'
 import { Link } from 'react-router-dom'
 import { useProjects, FREE_PLAN_LIMIT, PRO_PLAN_LIMIT } from '../context/ProjectsContext'
 
@@ -8,7 +8,7 @@ const Billing = () => {
   const [loading, setLoading] = useState(true)
   const [upgrading, setUpgrading] = useState(false)
 
-  const loadPlan = async () => {
+  const loadPlan = useCallback(async () => {
     setLoading(true)
     try {
       const info = await getPlanInfo()
@@ -16,11 +16,11 @@ const Billing = () => {
     } finally {
       setLoading(false)
     }
-  }
+  }, [getPlanInfo])
 
   useEffect(() => {
     loadPlan()
-  }, [])
+  }, [loadPlan])
 
   const handleUpgrade = async () => {
     setUpgrading(true)
@@ -78,4 +78,3 @@ const Billing = () => {
 }
 
 export default Billing
-
