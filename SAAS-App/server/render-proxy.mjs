@@ -106,6 +106,7 @@ const buildTimeline = (title, description, options = {}) => {
   const sceneLength = 3
   const titleAlign       = options.titleAlign        || 'center'
   const descriptionAlign = options.descriptionAlign  || 'center'
+  const textVertical     = options.textVertical      || 'center'
   const bgMode           = options.backgroundMode    || 'none'
   const bgColor          = options.backgroundColor   || '#0f0f0f'
   const bgAssetType      = options.backgroundAssetType || 'image'
@@ -115,41 +116,80 @@ const buildTimeline = (title, description, options = {}) => {
   const textColor        = options.textColor          || '#ffffff'
   const titleSize        = Number(options.titleSize)  || 58
   const textSize         = Number(options.textSize)   || 40
-  const alignX = { left: -0.6, center: 0, right: 0.6 }
-  const centerYByLines = { 1: 0.12, 2: 0.08, 3: 0.05 }
+  const alignX = { left: -0.35, center: 0, right: 0.35 }
+  const safeY = { top: 0.3, center: 0.1, bottom: -0.3 }
   const titleX = alignX[titleAlign] ?? 0
   const descriptionX = alignX[descriptionAlign] ?? 0
+  const titleY = safeY.center
+  const descriptionY = safeY[textVertical] ?? safeY.center
 
-  const preTracks = []
+  const totalTextDuration = titleLength + blocks.length * sceneLength
+  const tracks = []
 
+  // Track 0: background media
   if (bgMode === 'asset' && bgAssetType === 'video' && bgAssetUrl) {
-    preTracks.push({
+    tracks.push({
       clips: [{
         asset: { type: 'video', src: bgAssetUrl, volume: 0 },
         start: 0,
-        length: 'auto',
+        length: totalTextDuration,
         transition: { in: 'fade', out: 'fade' }
       }]
     })
-  }
-
-  if (bgMode === 'asset' && bgAssetType !== 'video' && bgAssetUrl) {
-    preTracks.push({
+  } else if (bgMode === 'asset' && bgAssetType !== 'video' && bgAssetUrl) {
+    tracks.push({
       clips: [{
         asset: { type: 'image', src: bgAssetUrl },
         start: 0,
-        length: 'end',
+        length: totalTextDuration,
         transition: { in: 'fade', out: 'fade' }
       }]
     })
   }
 
+  // Track 1+: text overlays
+  tracks.push({
+    clips: [
+      {
+        asset: {
+          type: 'text',
+          text: String(title || ''),
+          font: { family: 'Clear Sans', color: titleColor, size: titleSize },
+          alignment: { horizontal: titleAlign, vertical: 'center' },
+          width: 1000,
+          height: 140
+        },
+        start: 0,
+        length: titleLength,
+        position: 'center',
+        offset: { x: titleX, y: titleY },
+        transition: { in: 'fade', out: 'fade' }
+      },
+      ...blocks.map((block, i) => ({
+        asset: {
+          type: 'text',
+          text: block.join('\n'),
+          font: { family: 'Clear Sans', color: textColor, size: textSize },
+          alignment: { horizontal: descriptionAlign, vertical: 'center' },
+          width: 1000,
+          height: 260
+        },
+        start: titleLength + i * sceneLength,
+        length: sceneLength,
+        position: 'center',
+        offset: { x: descriptionX, y: descriptionY },
+        transition: { in: 'fade', out: 'fade' }
+      }))
+    ]
+  })
+
+  // Optional audio track
   if (musicUrl) {
-    preTracks.push({
+    tracks.push({
       clips: [{
         asset: { type: 'audio', src: musicUrl, effect: 'fadeOut', volume: 1 },
         start: 0,
-        length: 'end'
+        length: totalTextDuration
       }]
     })
   }
@@ -157,43 +197,7 @@ const buildTimeline = (title, description, options = {}) => {
   return {
     timeline: {
       background: bgMode === 'color' ? bgColor : '#0f0f0f',
-      tracks: [
-        ...preTracks,
-        {
-          clips: [
-            {
-              asset: {
-                type: 'text',
-                text: String(title || ''),
-                font: { family: 'Clear Sans', color: titleColor, size: titleSize },
-                alignment: { horizontal: titleAlign, vertical: 'center' },
-                width: 1000,
-                height: 140
-              },
-              start: 0,
-              length: titleLength,
-              position: 'center',
-              offset: { x: titleX, y: centerYByLines[1] },
-              transition: { in: 'fade', out: 'fade' }
-            },
-            ...blocks.map((block, i) => ({
-              asset: {
-                type: 'text',
-                text: block.join('\n'),
-                font: { family: 'Clear Sans', color: textColor, size: textSize },
-                alignment: { horizontal: descriptionAlign, vertical: 'center' },
-                width: 1000,
-                height: 260
-              },
-              start: titleLength + i * sceneLength,
-              length: sceneLength,
-              position: 'center',
-              offset: { x: descriptionX, y: centerYByLines[Math.min(3, block.length)] ?? 0.08 },
-              transition: { in: 'fade', out: 'fade' }
-            }))
-          ]
-        }
-      ]
+      tracks
     },
     output: { format: 'mp4', resolution: 'hd' }
   }
