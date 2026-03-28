@@ -121,10 +121,18 @@ export const addAsset = async (name, url) => {
 }
 
 export const removeAsset = async (id) => {
+  const userID = await getUserId()
+  const doc = await databases.getDocument({
+    databaseId: APPWRITE_DATABASE_ID,
+    collectionId: APPWRITE_ASSETS_COLLECTION_ID,
+    documentId: id
+  })
+  if (doc.userID !== userID) {
+    throw new Error('You do not have permission to delete this asset.')
+  }
   return databases.deleteDocument({
     databaseId: APPWRITE_DATABASE_ID,
     collectionId: APPWRITE_ASSETS_COLLECTION_ID,
     documentId: id
   })
 }
-

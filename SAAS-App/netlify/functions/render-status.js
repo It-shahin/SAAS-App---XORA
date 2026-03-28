@@ -20,6 +20,7 @@ exports.handler = async (event) => {
 
     const data = await res.json()
     if (!res.ok) {
+      console.error('render-status shotstack-failure', { status: res.status, body: data, renderId })
       return { statusCode: 502, body: JSON.stringify({ message: data?.message || 'Shotstack poll failed' }) }
     }
 

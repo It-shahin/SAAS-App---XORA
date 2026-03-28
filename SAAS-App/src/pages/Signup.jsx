@@ -1,16 +1,18 @@
 import { useState } from 'react'
 import { useAuth } from '../context/AuthContext'
-import { useNavigate, Link } from 'react-router-dom'
+import { useNavigate, Link, Navigate } from 'react-router-dom'
 import { getSafeAuthError } from '../lib/authErrors'
 
 const Signup = () => {
-  const { signup } = useAuth()
+  const { user, signup } = useAuth()
   const navigate = useNavigate()
   const [name, setName] = useState('')
   const [email, setEmail] = useState('')
   const [password, setPassword] = useState('')
   const [error, setError] = useState('')
   const [loading, setLoading] = useState(false)
+
+  if (user) return <Navigate to="/dashboard" replace />
 
   const handleSubmit = async (e) => {
     e.preventDefault()

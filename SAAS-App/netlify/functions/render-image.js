@@ -5,6 +5,17 @@ exports.handler = async (event) => {
 
   try {
     const { imageUrl, motionPrompt } = JSON.parse(event.body || '{}')
+    if (!String(imageUrl || '').trim()) {
+      return { statusCode: 400, body: JSON.stringify({ message: 'Missing imageUrl' }) }
+    }
+    try {
+      const parsed = new URL(imageUrl)
+      if (!['http:', 'https:'].includes(parsed.protocol)) {
+        return { statusCode: 400, body: JSON.stringify({ message: 'Invalid imageUrl protocol' }) }
+      }
+    } catch {
+      return { statusCode: 400, body: JSON.stringify({ message: 'Invalid imageUrl' }) }
+    }
     const apiKey = process.env.SHOTSTACK_API_KEY
     if (!apiKey) {
       return { statusCode: 500, body: JSON.stringify({ message: 'Missing SHOTSTACK_API_KEY' }) }
@@ -46,6 +57,7 @@ exports.handler = async (event) => {
 
     const data = await res.json()
     if (!res.ok || !data?.response?.id) {
+      console.error('render-image shotstack-failure', { status: res.status, body: data })
       return { statusCode: 502, body: JSON.stringify({ message: data?.message || 'Shotstack image render failed' }) }
     }
 

@@ -30,6 +30,7 @@ const DEFAULT_OPTIONS = {
   backgroundAssetUrl: '',
   musicUrl: '',
 }
+const MAX_POLL_ATTEMPTS = 90
 
 const ProjectDetail = () => {
   const { id } = useParams()
@@ -78,6 +79,7 @@ const ProjectDetail = () => {
   const [collaborators, setCollaborators] = useState([])
   const [comments, setComments] = useState([])
   const [queueStage, setQueueStage] = useState('Queued')
+  const [recovering, setRecovering] = useState(false)
 
   // Build current options object from state
   const getCurrentOptions = useCallback(() => ({
@@ -235,7 +237,9 @@ const ProjectDetail = () => {
 
   const startPolling = (renderId) => {
     if (pollingRef.current) clearInterval(pollingRef.current)
+    let attempts = 0
     pollingRef.current = setInterval(async () => {
+      attempts += 1
       try {
         const { status, url } = await pollRender(renderId)
         if (status === 'done') {
@@ -265,6 +269,19 @@ const ProjectDetail = () => {
           setQueueStage('Queued')
         } else {
           setQueueStage('Rendering')
+          if (attempts >= MAX_POLL_ATTEMPTS) {
+            clearInterval(pollingRef.current)
+            pollingRef.current = null
+            await databases.updateDocument({
+              databaseId: APPWRITE_DATABASE_ID,
+              collectionId: APPWRITE_PROJECTS_COLLECTION_ID,
+              documentId: id,
+              data: { status: 'draft' }
+            })
+            setGenError('Render timeout reached. Please retry generation.')
+            setGenerating(false)
+            setQueueStage('Queued')
+          }
         }
       } catch {
         clearInterval(pollingRef.current)
@@ -275,8 +292,61 @@ const ProjectDetail = () => {
     }, 4000)
   }
 
+  const validateRenderPreflight = () => {
+    if (project.mode === 'image') {
+      if (!project.sourceImageUrl) return 'Missing source image for image-to-video.'
+      try {
+        const u = new URL(project.sourceImageUrl)
+        if (!['http:', 'https:'].includes(u.protocol)) return 'Source image URL must be http/https.'
+      } catch {
+        return 'Source image URL is invalid.'
+      }
+    }
+    if (project.mode === 'text') {
+      const sceneText = derivedScenes.map((s) => s.text.trim()).filter(Boolean).join(' ')
+      if (!sceneText) return 'Please add scene text before generating.'
+    }
+    if (backgroundMode === 'asset' && backgroundAssetUrl) {
+      try {
+        const u = new URL(backgroundAssetUrl)
+        if (!['http:', 'https:'].includes(u.protocol)) return 'Background asset URL must be http/https.'
+      } catch {
+        return 'Background asset URL is invalid.'
+      }
+    }
+    return ''
+  }
+
+  const handleRecoverRenderState = async () => {
+    setRecovering(true)
+    setGenError('')
+    try {
+      await databases.updateDocument({
+        databaseId: APPWRITE_DATABASE_ID,
+        collectionId: APPWRITE_PROJECTS_COLLECTION_ID,
+        documentId: id,
+        data: { status: 'draft' }
+      })
+      if (pollingRef.current) {
+        clearInterval(pollingRef.current)
+        pollingRef.current = null
+      }
+      await fetchProject()
+      setQueueStage('Queued')
+    } catch {
+      setGenError('Could not recover render state. Please refresh and try again.')
+    } finally {
+      setRecovering(false)
+    }
+  }
+
   const handleGenerate = async () => {
     setGenError('')
+    const preflightError = validateRenderPreflight()
+    if (preflightError) {
+      setGenError(preflightError)
+      return
+    }
     const rendersLeft = await getUserRendersLeft()
     if (rendersLeft <= 0) {
       setGenError('You reached your current render limit. Upgrade from Billing.')
@@ -319,7 +389,7 @@ const ProjectDetail = () => {
       await fetchProject()
       startPolling(renderId)
     } catch {
-      setGenError('Failed to start generation. Please try again.')
+      setGenError('Failed to start generation. Check your API key, public asset URL access, and try again.')
       setGenerating(false)
       setQueueStage('Queued')
     }
@@ -542,6 +612,15 @@ const ProjectDetail = () => {
         {/* Generate */}
         {genError && (
           <p className="text-red-400 text-sm bg-red-500/10 border border-red-500/20 rounded-xl px-4 py-3">{genError}</p>
+        )}
+        {project.status === 'processing' && !generating && (
+          <button
+            onClick={handleRecoverRenderState}
+            disabled={recovering}
+            className="w-full border border-yellow-500/40 text-yellow-300 hover:bg-yellow-500/10 disabled:opacity-60 font-bold px-8 py-3 rounded-xl transition-colors"
+          >
+            {recovering ? 'Recovering...' : 'Recover Stuck Render'}
+          </button>
         )}
         <button onClick={handleGenerate} disabled={generating || project.status === 'processing'}
           className="w-full bg-indigo-500 hover:bg-indigo-600 disabled:opacity-50 text-white font-bold px-8 py-4 rounded-xl transition-colors">

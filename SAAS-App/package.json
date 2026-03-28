@@ -8,7 +8,8 @@
     "dev:proxy": "node server/render-proxy.mjs",
     "build": "vite build",
     "lint": "eslint .",
-    "preview": "vite preview"
+    "preview": "vite preview",
+    "smoke:mvp": "node scripts/smoke-mvp.mjs"
   },
   "dependencies": {
     "appwrite": "^23.0.0",

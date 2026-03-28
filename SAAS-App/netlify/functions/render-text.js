@@ -5,6 +5,12 @@ exports.handler = async (event) => {
 
   try {
     const { title, description, options = {} } = JSON.parse(event.body || '{}')
+    if (!String(title || '').trim()) {
+      return { statusCode: 400, body: JSON.stringify({ message: 'Missing title' }) }
+    }
+    if (!String(description || '').trim()) {
+      return { statusCode: 400, body: JSON.stringify({ message: 'Missing description' }) }
+    }
     const apiKey = process.env.SHOTSTACK_API_KEY
     if (!apiKey) {
       return { statusCode: 500, body: JSON.stringify({ message: 'Missing SHOTSTACK_API_KEY' }) }
@@ -149,6 +155,7 @@ exports.handler = async (event) => {
 
     const data = await res.json()
     if (!res.ok || !data?.response?.id) {
+      console.error('render-text shotstack-failure', { status: res.status, body: data })
       return { statusCode: 502, body: JSON.stringify({ message: data?.message || 'Shotstack create render failed' }) }
     }
 
