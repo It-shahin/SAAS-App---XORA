@@ -92,7 +92,7 @@ const NewProject = () => {
     <div className="min-h-screen bg-gray-900 text-white">
       <header className="border-b border-white/10 px-6 py-4 flex items-center justify-between sticky top-0 z-10 backdrop-blur-sm bg-gray-900/80">
         <Link to="/dashboard">
-          <img src="/images/xora.svg" width={120} height={48} alt="Trimix AI" />
+          <img src="/images/logo-trimmixai-nobg.png" width={178} height={48} alt="Trimix AI" />
         </Link>
         <Link to="/dashboard" className="text-gray-400 text-sm hover:text-white transition-colors">
           ← Back to Dashboard

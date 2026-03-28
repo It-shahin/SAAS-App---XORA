@@ -29,7 +29,7 @@ const Login = () => {
     <div className="flex min-h-screen flex-col justify-center px-6 py-12 lg:px-8 bg-gray-900">
       <div className="sm:mx-auto sm:w-full sm:max-w-sm">
         <Link to="/">
-          <img src="/images/xora.svg" alt="Trimix AI" className="mx-auto h-10 w-auto" />
+          <img src="/images/logo-trimmixai-nobg.png" alt="Trimix AI" className="mx-auto h-10 w-auto" />
         </Link>
         <h2 className="mt-10 text-center text-2xl font-bold tracking-tight text-white">Sign in to your account</h2>
       </div>

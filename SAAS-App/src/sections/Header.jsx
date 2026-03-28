@@ -56,7 +56,7 @@ const Header = () => {
     {/* Mobile Logo - Left aligned for hamburger space */}
     <Link to="/" className="lg:hidden cursor-pointer">
       <img 
-        src="/images/xora.svg" 
+        src="/images/logo-trimmixai-nobg.png" 
         width={160} 
         height={55} 
         alt="Trimix AI" 
@@ -83,8 +83,8 @@ const Header = () => {
         className="absolute left-1/2 transform -translate-x-1/2 cursor-pointer"
       >
         <img
-          src="/images/xora.svg"
-          width={160}
+          src="/images/logo-trimmixai-nobg.png"
+          width={200}
           height={55}
           alt="Trimix AI"
         />

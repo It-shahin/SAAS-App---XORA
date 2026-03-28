@@ -13,8 +13,8 @@ const Download = () => {
                 <div className="relative mr-6 flex-540 max-xl:flex-280 max-lg:flex256 max-md:flex-100">
                 <div className="mb-10">
                     <img
-                    src="/images/xora.svg"
-                    width={160}
+                    src="/images/logo-trimmixai-nobg.png"
+                    width={178}
                     height={55}
                     alt="Trimix AI"
                     />

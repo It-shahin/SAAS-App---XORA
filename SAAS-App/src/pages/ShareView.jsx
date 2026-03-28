@@ -104,7 +104,7 @@ const ShareView = () => {
     <div className="min-h-screen bg-s1 text-white flex flex-col">
       <header className="border-b border-s3/20 px-8 py-4 flex items-center justify-between">
         <Link to="/">
-          <img src="/images/xora.svg" width={100} height={40} alt="Trimix AI" />
+          <img src="/images/logo-trimmixai-nobg.png" width={178} height={40} alt="Trimix AI" />
         </Link>
         <Link to="/signup" className="bg-p1 hover:bg-p1/80 text-white text-sm font-bold px-4 py-2 rounded-xl transition-colors">
           Create your own

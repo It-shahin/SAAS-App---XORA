@@ -12,6 +12,18 @@ const ChangePassword = () => {
   const [error, setError] = useState('')
   const [success, setSuccess] = useState('')
   const [loading, setLoading] = useState(false)
+  const [showOld, setShowOld] = useState(false)
+  const [showNew, setShowNew] = useState(false)
+  const [showConfirm, setShowConfirm] = useState(false)
+
+  const hasMinLength = newPassword.length >= 8
+  const hasUpper = /[A-Z]/.test(newPassword)
+  const hasLower = /[a-z]/.test(newPassword)
+  const hasDigit = /\d/.test(newPassword)
+  const hasSymbol = /[^A-Za-z0-9]/.test(newPassword)
+  const checksPassed = [hasMinLength, hasUpper, hasLower, hasDigit, hasSymbol].filter(Boolean).length
+  const strengthLabel = checksPassed >= 5 ? 'Strong' : checksPassed >= 3 ? 'Medium' : newPassword ? 'Weak' : '—'
+  const strengthColor = checksPassed >= 5 ? 'bg-green-500' : checksPassed >= 3 ? 'bg-yellow-500' : 'bg-red-500'
 
   const handleSubmit = async (e) => {
     e.preventDefault()
@@ -57,7 +69,7 @@ const ChangePassword = () => {
       </div>
 
       <div className="mt-10 sm:mx-auto sm:w-full sm:max-w-sm">
-        <form onSubmit={handleSubmit} className="space-y-6">
+        <form onSubmit={handleSubmit} className="space-y-6 bg-white/5 border border-white/10 rounded-2xl p-6">
           {error && (
             <div className="bg-red-500/10 border border-red-500/30 rounded-xl px-4 py-3">
               <p className="text-red-400 text-sm">{error}</p>
@@ -76,13 +88,16 @@ const ChangePassword = () => {
             <div className="mt-2">
               <input
                 id="oldPassword"
-                type="password"
+                type={showOld ? 'text' : 'password'}
                 required
                 value={oldPassword}
                 onChange={(e) => setOldPassword(e.target.value)}
                 className="block w-full rounded-md bg-white/5 px-3 py-1.5 text-base text-white outline outline-1 -outline-offset-1 outline-white/10 placeholder:text-gray-500 focus:outline focus:outline-2 focus:-outline-offset-2 focus:outline-indigo-500 sm:text-sm"
                 placeholder="********"
               />
+              <button type="button" onClick={() => setShowOld((v) => !v)} className="mt-2 text-xs text-indigo-400 hover:text-indigo-300">
+                {showOld ? 'Hide current password' : 'Show current password'}
+              </button>
             </div>
           </div>
 
@@ -93,7 +108,7 @@ const ChangePassword = () => {
             <div className="mt-2">
               <input
                 id="newPassword"
-                type="password"
+                type={showNew ? 'text' : 'password'}
                 minLength={8}
                 required
                 value={newPassword}
@@ -101,6 +116,25 @@ const ChangePassword = () => {
                 className="block w-full rounded-md bg-white/5 px-3 py-1.5 text-base text-white outline outline-1 -outline-offset-1 outline-white/10 placeholder:text-gray-500 focus:outline focus:outline-2 focus:-outline-offset-2 focus:outline-indigo-500 sm:text-sm"
                 placeholder="********"
               />
+              <button type="button" onClick={() => setShowNew((v) => !v)} className="mt-2 text-xs text-indigo-400 hover:text-indigo-300">
+                {showNew ? 'Hide new password' : 'Show new password'}
+              </button>
+            </div>
+            <div className="mt-3">
+              <div className="flex items-center justify-between text-xs text-gray-400 mb-1">
+                <span>Password strength</span>
+                <span>{strengthLabel}</span>
+              </div>
+              <div className="h-2 rounded-full bg-white/10 overflow-hidden">
+                <div className={`h-full ${strengthColor}`} style={{ width: `${(checksPassed / 5) * 100}%` }} />
+              </div>
+              <ul className="mt-3 text-xs text-gray-400 space-y-1">
+                <li className={hasMinLength ? 'text-green-400' : ''}>At least 8 characters</li>
+                <li className={hasUpper ? 'text-green-400' : ''}>One uppercase letter</li>
+                <li className={hasLower ? 'text-green-400' : ''}>One lowercase letter</li>
+                <li className={hasDigit ? 'text-green-400' : ''}>One number</li>
+                <li className={hasSymbol ? 'text-green-400' : ''}>One special character</li>
+              </ul>
             </div>
           </div>
 
@@ -111,7 +145,7 @@ const ChangePassword = () => {
             <div className="mt-2">
               <input
                 id="confirmPassword"
-                type="password"
+                type={showConfirm ? 'text' : 'password'}
                 minLength={8}
                 required
                 value={confirm}
@@ -119,6 +153,14 @@ const ChangePassword = () => {
                 className="block w-full rounded-md bg-white/5 px-3 py-1.5 text-base text-white outline outline-1 -outline-offset-1 outline-white/10 placeholder:text-gray-500 focus:outline focus:outline-2 focus:-outline-offset-2 focus:outline-indigo-500 sm:text-sm"
                 placeholder="********"
               />
+              <button type="button" onClick={() => setShowConfirm((v) => !v)} className="mt-2 text-xs text-indigo-400 hover:text-indigo-300">
+                {showConfirm ? 'Hide confirmation' : 'Show confirmation'}
+              </button>
+              {confirm && (
+                <p className={`mt-2 text-xs ${confirm === newPassword ? 'text-green-400' : 'text-red-400'}`}>
+                  {confirm === newPassword ? 'Passwords match' : 'Passwords do not match'}
+                </p>
+              )}
             </div>
           </div>
 
@@ -138,4 +180,3 @@ const ChangePassword = () => {
 }
 
 export default ChangePassword
-

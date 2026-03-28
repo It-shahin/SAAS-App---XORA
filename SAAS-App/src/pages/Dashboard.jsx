@@ -40,7 +40,7 @@ const Dashboard = () => {
     <div className="flex min-h-screen flex-col bg-gray-900">
       <header className="border-b border-white/10 px-6 py-4 flex items-center justify-between sticky top-0 z-10 backdrop-blur-sm bg-gray-900/80">
         <Link to="/">
-          <img src="/images/xora.svg" width={120} height={48} alt="Trimix AI" />
+          <img src="/images/logo-trimmixai-nobg.png" width={178} height={48} alt="Trimix AI" />
         </Link>
         <div className="flex items-center gap-4">
           <div className="relative">
