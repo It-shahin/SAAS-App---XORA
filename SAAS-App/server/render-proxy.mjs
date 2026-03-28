@@ -66,7 +66,8 @@ const escapeHtml = (value = '') =>
     .replaceAll("'", '&#039;')
 
 const buildTimeline = (title, description, options = {}) => {
-  const MAX_CHARS_PER_LINE = 40
+  const REFERENCE_SENTENCE = 'A young man dancing with confidence in a modern'
+  const MAX_CHARS_PER_LINE = REFERENCE_SENTENCE.length
   const MAX_LINES_PER_BLOCK = 2
   const MAX_BLOCKS = 6
   const splitToBlocks = (raw = '') => {
@@ -86,7 +87,7 @@ const buildTimeline = (title, description, options = {}) => {
     if (current) lines.push(current)
     const blocks = []
     for (let i = 0; i < lines.length; i += MAX_LINES_PER_BLOCK) {
-      blocks.push({ lines: lines.slice(i, i + MAX_LINES_PER_BLOCK) })
+      blocks.push(lines.slice(i, i + MAX_LINES_PER_BLOCK))
       if (blocks.length >= MAX_BLOCKS) break
     }
     return blocks
@@ -101,28 +102,14 @@ const buildTimeline = (title, description, options = {}) => {
     ? blocksFromClient.slice(0, MAX_BLOCKS)
     : splitToBlocks(description)
 
-  const titleLength = 4
-  const sceneGap = 0.6
   const sceneLength = 3
-  const sceneStep = sceneLength + sceneGap
-  const firstSceneStart = titleLength + sceneGap
-
-  const titleAlign       = options.titleAlign        || 'center'
-  const descriptionAlign = options.descriptionAlign  || 'center'
-  const vertical         = options.textVertical      || 'top'
   const bgMode           = options.backgroundMode    || 'none'
   const bgColor          = options.backgroundColor   || '#0f0f0f'
   const bgAssetType      = options.backgroundAssetType || 'image'
   const bgAssetUrl       = options.backgroundAssetUrl  || ''
   const musicUrl         = options.musicUrl           || ''
-  const titleColor       = options.titleColor         || '#6366f1'
   const textColor        = options.textColor          || '#ffffff'
-  const titleSize        = Number(options.titleSize)  || 58
   const textSize         = Number(options.textSize)   || 40
-
-  const verticalOffsetMap = { top: -0.32, center: 0, bottom: 0.3 }
-  const titleY = verticalOffsetMap[vertical] ?? -0.32
-  const descriptionY = Math.min(titleY + 0.3, 0.55)
 
   const preTracks = []
 
@@ -164,34 +151,18 @@ const buildTimeline = (title, description, options = {}) => {
       tracks: [
         ...preTracks,
         {
-          clips: [{
-            asset: {
-              type: 'html',
-              html: `<p>${escapeHtml(String(title || ''))}</p>`,
-              css: `p { font-family: 'Open Sans', Arial, sans-serif; font-size: ${titleSize}px; font-weight: 800; color: ${titleColor}; text-align: ${titleAlign}; line-height: 1.2; margin: 0; white-space: normal; overflow-wrap: anywhere; word-break: break-word; }`,
-              width: 1150,
-              height: 120
-            },
-            start: 0,
-            length: titleLength,
-            position: 'center',
-            offset: { x: 0, y: titleY },
-            transition: { in: 'fade', out: 'fade' }
-          }]
-        },
-        {
           clips: blocks.map((block, i) => ({
             asset: {
-              type: 'html',
-              html: `<p>${block.map((line) => escapeHtml(line)).join('<br/>')}</p>`,
-              css: `p { font-family: 'Open Sans', Arial, sans-serif; font-size: ${textSize}px; font-weight: 600; color: ${textColor}; text-align: ${descriptionAlign}; line-height: 1.35; margin: 0; white-space: normal; overflow-wrap: anywhere; word-break: break-word; }`,
-              width: 1150,
+              type: 'text',
+              text: block.join('\n'),
+              font: { family: 'Clear Sans', color: textColor, size: textSize },
+              alignment: { horizontal: 'center', vertical: 'center' },
+              width: 1000,
               height: 260
             },
-            start: firstSceneStart + i * sceneStep,
+            start: i * sceneLength,
             length: sceneLength,
             position: 'center',
-            offset: { x: 0, y: descriptionY },
             transition: { in: 'fade', out: 'fade' }
           }))
         }
