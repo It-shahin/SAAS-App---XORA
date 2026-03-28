@@ -125,10 +125,23 @@ const StyleOptions = ({
               )}
             </div>
           )}
-          <input type="text" value={backgroundAssetUrl}
-            onChange={(e) => setBackgroundAssetUrl(e.target.value)}
-            placeholder="Or paste asset URL directly"
-            className="bg-white/5 border border-white/10 rounded-xl px-4 py-2 text-sm text-white placeholder-gray-600 focus:outline-none focus:border-indigo-500 transition-colors" />
+          {backgroundAssetUrl && (
+            <div className="bg-white/5 border border-white/10 rounded-xl p-3">
+              <p className="text-gray-400 text-xs mb-2">Selected background preview</p>
+              {backgroundAssetType === 'video' ? (
+                <video src={backgroundAssetUrl} className="w-full h-28 rounded-lg object-cover" controls />
+              ) : (
+                <img src={backgroundAssetUrl} alt="Selected background" className="w-full h-28 rounded-lg object-cover" />
+              )}
+              <button
+                type="button"
+                onClick={() => setBackgroundAssetUrl('')}
+                className="mt-2 text-xs text-red-400 hover:text-red-300"
+              >
+                Remove selected asset
+              </button>
+            </div>
+          )}
         </div>
       )}
     </div>
