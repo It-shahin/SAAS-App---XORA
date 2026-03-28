@@ -13,6 +13,7 @@ import CollaboratorsPanel from '../components/project/CollaboratorsPanel'
 import CommentsPanel from '../components/project/CommentsPanel'
 
 const QUEUE_STAGES = ['Queued', 'Preparing timeline', 'Rendering', 'Finalizing', 'Completed']
+const CAPTION_REFERENCE = 'A young man dancing with confidence in a modern'
 
 // Default render options — used as fallback when no saved options exist
 const DEFAULT_OPTIONS = {
@@ -202,6 +203,36 @@ const ProjectDetail = () => {
 
   const queueStageIndex = Math.max(0, QUEUE_STAGES.indexOf(queueStage))
 
+  const buildSubtitleBlocks = (text, fontSize) => {
+    const words = String(text || '').replace(/\s+/g, ' ').trim().split(' ').filter(Boolean)
+    if (words.length === 0) return []
+    const canvas = document.createElement('canvas')
+    const ctx = canvas.getContext('2d')
+    if (!ctx) return []
+    ctx.font = `600 ${fontSize}px Open Sans, Arial, sans-serif`
+    const maxWidth = ctx.measureText(CAPTION_REFERENCE).width
+
+    const lines = []
+    let current = ''
+    for (const word of words) {
+      const next = current ? `${current} ${word}` : word
+      if (ctx.measureText(next).width <= maxWidth) {
+        current = next
+      } else {
+        if (current) lines.push(current)
+        current = word
+      }
+    }
+    if (current) lines.push(current)
+
+    const blocks = []
+    for (let i = 0; i < lines.length; i += 2) {
+      blocks.push(lines.slice(i, i + 2))
+      if (blocks.length >= 8) break
+    }
+    return blocks
+  }
+
   const startPolling = (renderId) => {
     if (pollingRef.current) clearInterval(pollingRef.current)
     pollingRef.current = setInterval(async () => {
@@ -275,7 +306,7 @@ const ProjectDetail = () => {
         renderId = await submitRender(
           project.title,
           timelineText || project.description,
-          renderOptions   // ← user's actual chosen options, not defaults
+          { ...renderOptions, subtitleBlocks: buildSubtitleBlocks(timelineText || project.description, textSize) }
         )
       }
       setQueueStage('Rendering')

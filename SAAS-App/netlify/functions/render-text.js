@@ -35,7 +35,15 @@ exports.handler = async (event) => {
       }
       return blocks
     }
-    const blocks = splitToBlocks(description)
+    const blocksFromClient = Array.isArray(options.subtitleBlocks)
+      ? options.subtitleBlocks
+          .filter((b) => Array.isArray(b) || (b && Array.isArray(b.lines)))
+          .map((b) => (Array.isArray(b) ? b : b.lines).map((line) => String(line || '').trim()).filter(Boolean))
+          .filter((b) => b.length > 0)
+      : []
+    const blocks = blocksFromClient.length > 0
+      ? blocksFromClient.slice(0, MAX_BLOCKS)
+      : splitToBlocks(description)
     const titleLength = 4
     const sceneGap = 0.6
     const sceneLength = 3
@@ -124,7 +132,7 @@ exports.handler = async (event) => {
             clips: blocks.map((block, i) => ({
               asset: {
                 type: 'html',
-                html: `<p>${block.lines.map((line) => escapeHtml(line)).join('<br/>')}</p>`,
+                html: `<p>${block.map((line) => escapeHtml(line)).join('<br/>')}</p>`,
                 css: `p { font-family: 'Open Sans', Arial, sans-serif; font-size: ${textSize}px; font-weight: 600; color: ${textColor}; text-align: ${descriptionAlign}; line-height: 1.35; margin: 0; white-space: normal; overflow-wrap: anywhere; word-break: break-word; }`,
                 width: 1150,
                 height: 260
