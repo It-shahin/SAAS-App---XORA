@@ -116,6 +116,7 @@ const buildTimeline = (title, description, options = {}) => {
   const titleSize        = Number(options.titleSize)  || 58
   const textSize         = Number(options.textSize)   || 40
   const alignX = { left: -0.6, center: 0, right: 0.6 }
+  const centerYByLines = { 1: 0.12, 2: 0.08, 3: 0.05 }
   const titleX = alignX[titleAlign] ?? 0
   const descriptionX = alignX[descriptionAlign] ?? 0
 
@@ -165,14 +166,14 @@ const buildTimeline = (title, description, options = {}) => {
                 type: 'text',
                 text: String(title || ''),
                 font: { family: 'Clear Sans', color: titleColor, size: titleSize },
-                alignment: { horizontal: titleAlign, vertical: 'top' },
+                alignment: { horizontal: titleAlign, vertical: 'center' },
                 width: 1000,
                 height: 140
               },
               start: 0,
               length: titleLength,
               position: 'center',
-              offset: { x: titleX, y: -0.22 },
+              offset: { x: titleX, y: centerYByLines[1] },
               transition: { in: 'fade', out: 'fade' }
             },
             ...blocks.map((block, i) => ({
@@ -187,7 +188,7 @@ const buildTimeline = (title, description, options = {}) => {
               start: titleLength + i * sceneLength,
               length: sceneLength,
               position: 'center',
-              offset: { x: descriptionX, y: 0 },
+              offset: { x: descriptionX, y: centerYByLines[Math.min(3, block.length)] ?? 0.08 },
               transition: { in: 'fade', out: 'fade' }
             }))
           ]
