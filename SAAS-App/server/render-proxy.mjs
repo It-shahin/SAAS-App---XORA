@@ -104,6 +104,8 @@ const buildTimeline = (title, description, options = {}) => {
 
   const titleLength = 3
   const sceneLength = 3
+  const titleAlign       = options.titleAlign        || 'center'
+  const descriptionAlign = options.descriptionAlign  || 'center'
   const bgMode           = options.backgroundMode    || 'none'
   const bgColor          = options.backgroundColor   || '#0f0f0f'
   const bgAssetType      = options.backgroundAssetType || 'image'
@@ -113,6 +115,9 @@ const buildTimeline = (title, description, options = {}) => {
   const textColor        = options.textColor          || '#ffffff'
   const titleSize        = Number(options.titleSize)  || 58
   const textSize         = Number(options.textSize)   || 40
+  const alignX = { left: -0.6, center: 0, right: 0.6 }
+  const titleX = alignX[titleAlign] ?? 0
+  const descriptionX = alignX[descriptionAlign] ?? 0
 
   const preTracks = []
 
@@ -160,13 +165,14 @@ const buildTimeline = (title, description, options = {}) => {
                 type: 'text',
                 text: String(title || ''),
                 font: { family: 'Clear Sans', color: titleColor, size: titleSize },
-                alignment: { horizontal: 'center', vertical: 'top' },
+                alignment: { horizontal: titleAlign, vertical: 'top' },
                 width: 1000,
                 height: 140
               },
               start: 0,
               length: titleLength,
               position: 'center',
+              offset: { x: titleX, y: -0.22 },
               transition: { in: 'fade', out: 'fade' }
             },
             ...blocks.map((block, i) => ({
@@ -174,13 +180,14 @@ const buildTimeline = (title, description, options = {}) => {
                 type: 'text',
                 text: block.join('\n'),
                 font: { family: 'Clear Sans', color: textColor, size: textSize },
-                alignment: { horizontal: 'center', vertical: 'center' },
+                alignment: { horizontal: descriptionAlign, vertical: 'center' },
                 width: 1000,
                 height: 260
               },
               start: titleLength + i * sceneLength,
               length: sceneLength,
               position: 'center',
+              offset: { x: descriptionX, y: 0 },
               transition: { in: 'fade', out: 'fade' }
             }))
           ]
