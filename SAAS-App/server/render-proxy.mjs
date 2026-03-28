@@ -102,13 +102,16 @@ const buildTimeline = (title, description, options = {}) => {
     ? blocksFromClient.slice(0, MAX_BLOCKS)
     : splitToBlocks(description)
 
+  const titleLength = 3
   const sceneLength = 3
   const bgMode           = options.backgroundMode    || 'none'
   const bgColor          = options.backgroundColor   || '#0f0f0f'
   const bgAssetType      = options.backgroundAssetType || 'image'
   const bgAssetUrl       = options.backgroundAssetUrl  || ''
   const musicUrl         = options.musicUrl           || ''
+  const titleColor       = options.titleColor         || '#6366f1'
   const textColor        = options.textColor          || '#ffffff'
+  const titleSize        = Number(options.titleSize)  || 58
   const textSize         = Number(options.textSize)   || 40
 
   const preTracks = []
@@ -151,20 +154,36 @@ const buildTimeline = (title, description, options = {}) => {
       tracks: [
         ...preTracks,
         {
-          clips: blocks.map((block, i) => ({
-            asset: {
-              type: 'text',
-              text: block.join('\n'),
-              font: { family: 'Clear Sans', color: textColor, size: textSize },
-              alignment: { horizontal: 'center', vertical: 'center' },
-              width: 1000,
-              height: 260
+          clips: [
+            {
+              asset: {
+                type: 'text',
+                text: String(title || ''),
+                font: { family: 'Clear Sans', color: titleColor, size: titleSize },
+                alignment: { horizontal: 'center', vertical: 'top' },
+                width: 1000,
+                height: 140
+              },
+              start: 0,
+              length: titleLength,
+              position: 'center',
+              transition: { in: 'fade', out: 'fade' }
             },
-            start: i * sceneLength,
-            length: sceneLength,
-            position: 'center',
-            transition: { in: 'fade', out: 'fade' }
-          }))
+            ...blocks.map((block, i) => ({
+              asset: {
+                type: 'text',
+                text: block.join('\n'),
+                font: { family: 'Clear Sans', color: textColor, size: textSize },
+                alignment: { horizontal: 'center', vertical: 'center' },
+                width: 1000,
+                height: 260
+              },
+              start: titleLength + i * sceneLength,
+              length: sceneLength,
+              position: 'center',
+              transition: { in: 'fade', out: 'fade' }
+            }))
+          ]
         }
       ]
     },

@@ -4,7 +4,7 @@ exports.handler = async (event) => {
   }
 
   try {
-    const { description, options = {} } = JSON.parse(event.body || '{}')
+    const { title, description, options = {} } = JSON.parse(event.body || '{}')
     const apiKey = process.env.SHOTSTACK_API_KEY
     if (!apiKey) {
       return { statusCode: 500, body: JSON.stringify({ message: 'Missing SHOTSTACK_API_KEY' }) }
@@ -45,13 +45,16 @@ exports.handler = async (event) => {
     const blocks = blocksFromClient.length > 0
       ? blocksFromClient.slice(0, MAX_BLOCKS)
       : splitToBlocks(description)
+    const titleLength = 3
     const sceneLength = 3
     const bgMode = options.backgroundMode || 'none'
     const bgColor = options.backgroundColor || '#0f0f0f'
     const bgAssetType = options.backgroundAssetType || 'image'
     const bgAssetUrl = options.backgroundAssetUrl || ''
     const musicUrl = options.musicUrl || ''
+    const titleColor = options.titleColor || '#6366f1'
     const textColor = options.textColor || '#ffffff'
+    const titleSize = Number(options.titleSize) || 58
     const textSize = Number(options.textSize) || 40
 
     const preTracks = []
@@ -90,8 +93,23 @@ exports.handler = async (event) => {
         background: bgMode === 'color' ? bgColor : '#0f0f0f',
         tracks: [
           ...preTracks,
-          {
-            clips: blocks.map((block, i) => ({
+        {
+          clips: [
+            {
+              asset: {
+                type: 'text',
+                text: String(title || ''),
+                font: { family: 'Clear Sans', color: titleColor, size: titleSize },
+                alignment: { horizontal: 'center', vertical: 'top' },
+                width: 1000,
+                height: 140
+              },
+              start: 0,
+              length: titleLength,
+              position: 'center',
+              transition: { in: 'fade', out: 'fade' }
+            },
+            ...blocks.map((block, i) => ({
               asset: {
                 type: 'text',
                 text: block.join('\n'),
@@ -100,13 +118,14 @@ exports.handler = async (event) => {
                 width: 1000,
                 height: 260
               },
-              start: i * sceneLength,
+              start: titleLength + i * sceneLength,
               length: sceneLength,
               position: 'center',
               transition: { in: 'fade', out: 'fade' }
             }))
-          }
-        ]
+          ]
+        }
+      ]
       },
       output: { format: 'mp4', resolution: 'hd' }
     }
