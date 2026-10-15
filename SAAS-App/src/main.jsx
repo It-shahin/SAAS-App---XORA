@@ -3,17 +3,17 @@ import ReactDOM from 'react-dom/client'
 import './index.css'
 
 const requiredSettings = [
-  'VITE_APPWRITE_PROJECT_ID',
-  'VITE_APPWRITE_DATABASE_ID',
-  'VITE_APPWRITE_PROJECTS_COLLECTION_ID',
-  'VITE_APPWRITE_SHARES_COLLECTION_ID',
-  'VITE_APPWRITE_ASSETS_BUCKET_ID',
-  'VITE_APPWRITE_SCENES_COLLECTION_ID',
-  'VITE_APPWRITE_COMMENTS_COLLECTION_ID',
-  'VITE_APPWRITE_COLLABORATORS_COLLECTION_ID',
-  'VITE_APPWRITE_ASSETS_COLLECTION_ID',
+  import.meta.env.VITE_APPWRITE_PROJECT_ID,
+  import.meta.env.VITE_APPWRITE_DATABASE_ID,
+  import.meta.env.VITE_APPWRITE_PROJECTS_COLLECTION_ID,
+  import.meta.env.VITE_APPWRITE_SHARES_COLLECTION_ID,
+  import.meta.env.VITE_APPWRITE_ASSETS_BUCKET_ID,
+  import.meta.env.VITE_APPWRITE_SCENES_COLLECTION_ID,
+  import.meta.env.VITE_APPWRITE_COMMENTS_COLLECTION_ID,
+  import.meta.env.VITE_APPWRITE_COLLABORATORS_COLLECTION_ID,
+  import.meta.env.VITE_APPWRITE_ASSETS_COLLECTION_ID,
 ]
-const isConfigured = requiredSettings.every((key) => Boolean(import.meta.env[key]))
+const isConfigured = requiredSettings.every(Boolean)
 const ConfiguredApp = lazy(() => import('./configured-app.jsx'))
 
 ReactDOM.createRoot(document.getElementById('root')).render(
