@@ -1,4 +1,5 @@
 import { RENDER_PROXY_URL } from './config'
+import { account } from './appwrite'
 
 const normalizeBase = (base) => {
   if (!base || base === '/') return ''
@@ -6,9 +7,10 @@ const normalizeBase = (base) => {
 }
 
 const request = async (path, options = {}) => {
+  const { jwt } = await account.createJWT()
   const response = await fetch(`${normalizeBase(RENDER_PROXY_URL)}${path}`, {
-    headers: { 'Content-Type': 'application/json', ...(options.headers || {}) },
-    ...options
+    ...options,
+    headers: { 'Content-Type': 'application/json', ...(options.headers || {}), Authorization: `Bearer ${jwt}` }
   })
 
   const data = await response.json().catch(() => ({}))
@@ -38,3 +40,4 @@ export const pollRender = async (renderId) => {
   const data = await request(`/api/render/status?id=${encodeURIComponent(renderId)}`)
   return { status: data.status, url: data.url }
 }
+
