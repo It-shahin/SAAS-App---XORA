@@ -25,6 +25,7 @@ export const submitRender = async (title, description, options = {}) => {
     method: 'POST',
     body: JSON.stringify({ title, description, options })
   })
+  if (data.pollToken) localStorage.setItem(`shotstack-receipt:${data.renderId}`, data.pollToken)
   return data.renderId
 }
 
@@ -33,11 +34,15 @@ export const submitImageRender = async (imageUrl, motionPrompt) => {
     method: 'POST',
     body: JSON.stringify({ imageUrl, motionPrompt })
   })
+  if (data.pollToken) localStorage.setItem(`shotstack-receipt:${data.renderId}`, data.pollToken)
   return data.renderId
 }
 
 export const pollRender = async (renderId) => {
-  const data = await request(`/api/render/status?id=${encodeURIComponent(renderId)}`)
+  const pollToken = localStorage.getItem(`shotstack-receipt:${renderId}`) || ''
+  const data = await request(`/api/render/status?id=${encodeURIComponent(renderId)}`, {
+    headers: { 'X-Render-Receipt': pollToken }
+  })
   return { status: data.status, url: data.url }
 }
 

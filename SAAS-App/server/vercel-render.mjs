@@ -1,4 +1,8 @@
 import { renderText, renderImage, renderStatus } from './shotstack-handlers.mjs'
+import { createHmac, timingSafeEqual } from 'node:crypto'
+
+const receiptFor = (userId, renderId) => createHmac('sha256', process.env.SHOTSTACK_API_KEY)
+  .update(JSON.stringify([userId, renderId])).digest('base64url')
 
 const json = (message, status) => Response.json({ message }, {
   status, headers: { 'Cache-Control': 'no-store' }
@@ -24,17 +28,17 @@ export async function handleRender(request) {
     if (!user.$id) return json('Your session expired. Sign in again.', 401)
 
     const url = new URL(request.url)
+    if (!process.env.SHOTSTACK_API_KEY) return json('Video rendering is not configured.', 503)
     if (operation === 'status') {
       const id = url.searchParams.get('id')
       if (!id || !/^[a-zA-Z0-9-]{1,100}$/.test(id)) return json('Invalid render id.', 400)
-      // Appwrite enforces document permissions using the requesting user's JWT.
-      const documentsUrl = new URL(`${endpoint}/databases/${encodeURIComponent(process.env.VITE_APPWRITE_DATABASE_ID)}/collections/${encodeURIComponent(process.env.VITE_APPWRITE_PROJECTS_COLLECTION_ID)}/documents`)
-      documentsUrl.searchParams.append('queries[]', JSON.stringify({ method: 'equal', attribute: 'renderID', values: [id] }))
-      documentsUrl.searchParams.append('queries[]', JSON.stringify({ method: 'limit', values: [1] }))
-      const projectsResponse = await fetch(documentsUrl, { headers })
-      if (!projectsResponse.ok) return json('Unable to verify render ownership.', 503)
-      const projects = await projectsResponse.json()
-      if (!projects.documents?.some(project => project.userID === user.$id)) return json('Render not found.', 404)
+      // A client-editable project record cannot establish ownership. Only the
+      // server can sign a receipt binding this render to the authenticated user.
+      const receipt = request.headers.get('x-render-receipt') || ''
+      const expected = receiptFor(user.$id, id)
+      if (!/^[A-Za-z0-9_-]{43}$/.test(receipt) || !timingSafeEqual(Buffer.from(receipt), Buffer.from(expected))) {
+        return json('Render not found.', 404)
+      }
     }
 
     let body = ''
@@ -48,14 +52,17 @@ export async function handleRender(request) {
         return json('Shorten the title or script before rendering.', 400)
       }
     }
-    if (!process.env.SHOTSTACK_API_KEY) return json('Video rendering is not configured.', 503)
     const handler = { text: renderText, image: renderImage, status: renderStatus }[operation]
     const result = await handler({
       httpMethod: request.method,
       queryStringParameters: Object.fromEntries(url.searchParams),
       body
     })
-    return new Response(result.body, {
+    const data = JSON.parse(result.body)
+    if (result.statusCode === 200 && data.renderId) {
+      data.pollToken = receiptFor(user.$id, data.renderId)
+    }
+    return new Response(JSON.stringify(data), {
       status: result.statusCode,
       headers: { 'Content-Type': 'application/json', 'Cache-Control': 'no-store' }
     })
